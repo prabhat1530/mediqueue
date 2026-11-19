@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MediQueue Board</title>
+  <style>
+    :root { --EMERGENCY: #ef5350; --SENIOR: #b388ff; --APPOINTMENT: #64b5f6; --WALKIN: #b0bec5; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #0b1620; color: #e8eef3; font-family: system-ui, -apple-system, Segoe UI, sans-serif; padding: 24px; }
+    h1 { margin: 0; font-size: clamp(22px, 3vw, 34px); }
+    .sub { color: #8aa0b2; margin-top: 4px; }
+    .now { margin: 28px 0; padding: 28px; border-radius: 16px; background: #0f766e; text-align: center; }
+    .now .label { text-transform: uppercase; letter-spacing: .12em; opacity: .8; }
+    .now .num { font-size: clamp(64px, 14vw, 140px); font-weight: 800; line-height: 1.05; }
+    .now .who { font-size: clamp(18px, 2.4vw, 26px); }
+    .now.flash { animation: flash 1s ease 3; }
+    @keyframes flash { 50% { background: #f9a825; color: #111; } }
+    table { width: 100%; border-collapse: collapse; font-size: clamp(16px, 2vw, 22px); }
+    th, td { padding: 12px 10px; border-bottom: 1px solid #1d2c39; text-align: left; }
+    th { color: #8aa0b2; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; }
+    .cat { font-weight: 700; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+    .live { float: right; font-size: 13px; color: #8aa0b2; }
+    .live::before { content: '●'; margin-right: 6px; color: #66bb6a; }
+    .live.off::before { color: #ef5350; }
+  </style>
+</head>
+<body>
+  <span id="live" class="live off">connecting…</span>
+  <h1 id="doctor">Display board</h1>
+  <div class="sub" id="spec"></div>
+
+  <div class="now" id="now">
+    <div class="label">Now serving</div>
+    <div class="num" id="nowNum">—</div>
+    <div class="who" id="nowWho">&nbsp;</div>
+  </div>
+
+  <table>
+    <thead><tr><th>Token</th><th>Patient</th><th>Category</th><th>Est. wait</th></tr></thead>
+    <tbody id="waiting"></tbody>
+  </table>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// Privacy on a public screen: show first name + initial only.
+const shortName = (n) => { const [first, last] = String(n).split(' '); return last ? `${first} ${last[0]}.` : first; };
+
+const doctorId = new URLSearchParams(location.search).get('doctor') || '1';
+const socket = io();
+let lastServing = null;
+
+socket.on('connect', () => { $('live').textContent = 'live'; $('live').className = 'live'; socket.emit('watch:doctor', doctorId); });
+socket.on('disconnect', () => { $('live').textContent = 'reconnecting…'; $('live').className = 'live off'; });
+socket.on('board:error', (msg) => { $('doctor').textContent = msg; });
+
+socket.on('queue', ({ doctor, current, waiting }) => {
+  $('doctor').textContent = doctor.name;
+  $('spec').textContent = `${doctor.specialization} · ~${doctor.avg_consult_mins} min per patient`;
+
+  const serving = current[0];
+  $('nowNum').textContent = serving ? serving.token_no : '—';
+  $('nowWho').textContent = serving ? `${shortName(serving.patient_name)} · ${serving.status.replace('_', ' ')}` : 'Please wait';
+  if (serving && serving.id !== lastServing) {
+    $('now').classList.remove('flash'); void $('now').offsetWidth; $('now').classList.add('flash');
+  }
+  lastServing = serving?.id ?? null;
+
+  $('waiting').innerHTML = waiting.map((t) => `
+    <tr>
+      <td><b>${t.token_no}</b></td>
+      <td>${esc(shortName(t.patient_name))}</td>
+      <td class="cat"><span class="dot" style="background:var(--${t.category})"></span>${t.category}</td>
+      <td>${t.estimatedWaitMins === 0 ? 'Next' : `~${t.estimatedWaitMins} min`}</td>
+    </tr>`).join('') || '<tr><td colspan="4" style="color:#8aa0b2">No one waiting</td></tr>';
+});
+</script>
+</body>
+</html>
