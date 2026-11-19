@@ -1,0 +1,490 @@
+<title>MediQueue Viva Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: one scrolling study sheet, sticky section index on top; each section turns a DESIGN.md table into a picture you can click. Shares the LLD Explorer's ward-board palette. */
+:root {
+  --bg: #eef2f0;
+  --surface: #ffffff;
+  --sunk: #e3e9e6;
+  --line: #cdd7d2;
+  --ink: #13201c;
+  --muted: #56655f;
+  --accent: #0b6e66;
+  --accent-soft: #d3ebe7;
+  --board: #10201c;
+  --board-ink: #e9f5f1;
+  --warm: #b8730a;
+  --warm-soft: #f6e7cc;
+  --bad: #b3261e;
+  --bad-soft: #f8dedb;
+  --ok: #217a45;
+  --ok-soft: #d8efe0;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1513; --surface: #15211e; --sunk: #1b2925; --line: #2c3d38; --ink: #e2ece8; --muted: #93a7a0;
+    --accent: #4cc2b5; --accent-soft: #173a35; --board: #07100e; --board-ink: #d8f1ea;
+    --warm: #e3a33f; --warm-soft: #3a2c14; --bad: #f2847b; --bad-soft: #3b1d1b; --ok: #5dc488; --ok-soft: #173826;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1513; --surface: #15211e; --sunk: #1b2925; --line: #2c3d38; --ink: #e2ece8; --muted: #93a7a0;
+  --accent: #4cc2b5; --accent-soft: #173a35; --board: #07100e; --board-ink: #d8f1ea;
+  --warm: #e3a33f; --warm-soft: #3a2c14; --bad: #f2847b; --bad-soft: #3b1d1b; --ok: #5dc488; --ok-soft: #173826;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 70px; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--board); }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.8rem); font-weight: 800; font-stretch: 78%; }
+h2 { font-size: 1.6rem; font-weight: 750; font-stretch: 88%; }
+h3 { font-size: 1.02rem; font-weight: 700; }
+p { margin: 0; }
+code { font-family: var(--mono); font-size: .84em; background: var(--sunk); padding: 1px 5px; border-radius: 3px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--board); color: var(--board-ink); }
+.top .wrap { display: flex; align-items: center; gap: 18px; padding-block: 10px; }
+.brand { font-family: var(--display); font-weight: 800; font-stretch: 75%; font-size: 1.3rem; white-space: nowrap; }
+.brand small { font-family: var(--mono); font-weight: 400; font-size: .7rem; opacity: .65; margin-left: 8px; letter-spacing: .08em; text-transform: uppercase; font-stretch: 100%; }
+nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+nav::-webkit-scrollbar { display: none; }
+nav a { color: inherit; text-decoration: none; font-family: var(--mono); font-size: .78rem; padding: 6px 10px; border-radius: 4px; white-space: nowrap; opacity: .72; }
+nav a:hover { opacity: 1; background: rgba(255,255,255,.08); }
+nav a.on { opacity: 1; background: var(--accent); color: #fff; }
+@media (max-width: 720px) { .top .wrap { flex-direction: column; align-items: stretch; gap: 6px; } .brand small { display: none; } }
+
+main { display: grid; gap: 64px; padding-block: 32px 80px; }
+section { display: grid; gap: 18px; }
+.head { display: grid; gap: 8px; }
+.eyebrow { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); }
+.lede { max-width: 66ch; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px; min-width: 0; }
+.chip { display: inline-flex; align-items: center; font-family: var(--mono); font-size: .74rem; padding: 3px 9px; border-radius: 3px; background: var(--sunk); border: 1px solid transparent; cursor: pointer; white-space: nowrap; }
+.chip:hover { border-color: var(--accent); }
+.chip.on { background: var(--accent); color: #fff; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* hero */
+.hero { display: grid; gap: 16px; }
+.chain { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; }
+.chain > div { flex: 1 1 150px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); margin-left: -1px; position: relative; min-width: 0; }
+.chain > div:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+.chain > div:last-child { border-radius: 0 8px 8px 0; }
+.chain b { display: block; font-family: var(--display); font-stretch: 85%; font-size: 1.1rem; }
+.chain span { font-size: .82rem; color: var(--muted); }
+.chain i { font-style: normal; font-family: var(--mono); font-size: .72rem; color: var(--accent); }
+@media (max-width: 640px) { .chain > div { flex-basis: 100%; margin-left: 0; margin-top: -1px; border-radius: 0 !important; } .chain > div:first-child { border-radius: 8px 8px 0 0 !important; } .chain > div:last-child { border-radius: 0 0 8px 8px !important; } }
+
+/* architecture */
+.arch { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .arch { grid-template-columns: 1fr; } }
+.diagram { overflow-x: auto; padding: 10px; }
+.diagram svg { display: block; }
+.n rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; cursor: pointer; }
+.n text { fill: var(--ink); font-family: var(--mono); font-size: 13px; font-weight: 700; pointer-events: none; }
+.n text.s { font-weight: 400; font-size: 11px; fill: var(--muted); }
+.n:hover rect { stroke: var(--accent); }
+.n.sel rect { fill: var(--accent); stroke: var(--accent); }
+.n.sel text { fill: #fff; }
+.n.dark rect { fill: var(--board); stroke: var(--board); }
+.n.dark text { fill: var(--board-ink); }
+.n.dark text.s { fill: var(--board-ink); opacity: .7; }
+.n.dark.sel rect { fill: var(--accent); }
+.n.root rect { fill: var(--accent-soft); stroke: var(--accent); stroke-dasharray: 6 4; }
+.n.root text { fill: var(--accent); }
+.e path { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.e.ev path { stroke: var(--warm); stroke-dasharray: 5 4; }
+.e text { fill: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+.e.ev text { fill: var(--warm); }
+.mk { fill: var(--muted); } .mk-ev { fill: var(--warm); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--mono); font-size: .72rem; color: var(--muted); padding: 4px 6px 0; }
+.legend span::before { content: ""; display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--muted); vertical-align: middle; margin-right: 6px; }
+.legend span.ev::before { border-top: 2px dashed var(--warm); }
+.info { display: grid; gap: 12px; position: sticky; top: 72px; }
+.info .folder { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+.dos { display: grid; gap: 8px; }
+.do, .dont { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; padding: 10px 12px; border-radius: 6px; font-size: .9rem; }
+.do { background: var(--ok-soft); } .dont { background: var(--bad-soft); }
+.do b, .dont b { font-family: var(--mono); font-size: .9rem; }
+.do b { color: var(--ok); } .dont b { color: var(--bad); }
+
+/* requirement map */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.filters .lbl { font-family: var(--mono); font-size: .72rem; color: var(--muted); margin-right: 4px; }
+.reqs { display: grid; gap: 8px; }
+.req { display: grid; grid-template-columns: minmax(0, 1.1fr) 20px minmax(0, 1.4fr) 20px minmax(0, .8fr) 20px minmax(0, 1.1fr); align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.req .arrow { color: var(--muted); text-align: center; font-family: var(--mono); }
+.req .need { font-weight: 600; }
+.req .concept { font-size: .88rem; color: var(--muted); }
+.req .pat { font-family: var(--mono); font-size: .74rem; }
+.req .pat span { display: inline-block; padding: 2px 7px; border-radius: 3px; background: var(--accent); color: #fff; }
+.req .pat span.none { background: transparent; color: var(--muted); padding: 0; }
+.req .where { font-family: var(--mono); font-size: .74rem; color: var(--ink); word-break: break-word; }
+.req.star { border-color: var(--warm); box-shadow: inset 4px 0 0 var(--warm); }
+.colheads { display: grid; grid-template-columns: minmax(0, 1.1fr) 20px minmax(0, 1.4fr) 20px minmax(0, .8fr) 20px minmax(0, 1.1fr); gap: 6px; padding: 0 15px; font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+@media (max-width: 820px) {
+  .colheads { display: none; }
+  .req { grid-template-columns: 1fr; gap: 4px; }
+  .req .arrow { display: none; }
+  .req .concept::before { content: "Concept · "; font-family: var(--mono); font-size: .7rem; }
+  .req .where::before { content: "File · "; color: var(--muted); }
+}
+
+/* SOLID */
+.solid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 960px) { .solid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .solid { grid-template-columns: 1fr; } }
+.letter { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.letter .L { font-family: var(--display); font-weight: 800; font-stretch: 70%; font-size: 3.2rem; line-height: .9; color: var(--accent); }
+.letter h3 { font-size: .98rem; }
+.letter .mean { font-size: .86rem; font-style: italic; color: var(--muted); }
+.letter .proof { font-size: .84rem; border-top: 1px solid var(--line); padding-top: 8px; }
+.pillars { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 860px) { .pillars { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .pillars { grid-template-columns: 1fr; } }
+.pillar { border-top: 3px solid var(--ink); padding-top: 10px; display: grid; gap: 4px; font-size: .86rem; }
+.pillar h3 { font-size: .95rem; }
+.pillar p { color: var(--muted); }
+
+/* live coding */
+.tasks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 12px; }
+.task { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 12px; align-content: start; }
+.task .ask { font-family: var(--display); font-weight: 700; font-stretch: 88%; font-size: 1.08rem; }
+.task .ask::before { content: "Examiner: "; font-family: var(--mono); font-weight: 400; font-size: .7rem; color: var(--muted); display: block; font-stretch: 100%; text-transform: uppercase; letter-spacing: .08em; }
+.task .how { font-size: .88rem; color: var(--muted); }
+.files { display: grid; gap: 4px; }
+.file { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-family: var(--mono); font-size: .76rem; padding: 6px 9px; border-radius: 4px; background: var(--sunk); }
+.tag { font-size: .66rem; font-weight: 700; padding: 1px 6px; border-radius: 2px; }
+.tag.add { background: var(--ok-soft); color: var(--ok); }
+.tag.edit { background: var(--warm-soft); color: var(--warm); }
+.tag.cfg { background: var(--accent-soft); color: var(--accent); }
+.verdict { font-family: var(--mono); font-size: .74rem; color: var(--muted); }
+.verdict b { color: var(--ok); }
+.ocp { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+
+/* trade-offs */
+.trades { display: grid; gap: 10px; }
+.trade { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.trade .no { font-family: var(--display); font-weight: 800; font-stretch: 70%; font-size: 1.8rem; color: var(--accent); line-height: 1; }
+.trade .k { font-family: var(--mono); font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); display: block; margin-bottom: 2px; }
+.trade .pick { font-weight: 600; }
+.trade .over { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--bad); }
+.trade .why { font-size: .88rem; }
+.trade .cost { font-size: .82rem; color: var(--warm); margin-top: 6px; }
+@media (max-width: 760px) { .trade { grid-template-columns: 36px 1fr; } .trade > div:nth-child(n+3) { grid-column: 2; } }
+
+/* flashcards */
+.cardbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.progress { flex: 1; min-width: 160px; height: 8px; background: var(--sunk); border-radius: 4px; overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+.count { font-family: var(--mono); font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: .84rem; }
+.btn:hover { border-color: var(--accent); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.fc { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; cursor: pointer; display: grid; gap: 10px; align-content: start; min-height: 150px; }
+.fc:hover { border-color: var(--accent); }
+.fc .q { font-family: var(--display); font-weight: 700; font-stretch: 90%; font-size: 1.05rem; line-height: 1.3; }
+.fc .qn { font-family: var(--mono); font-size: .7rem; color: var(--accent); }
+.fc .a { font-size: .9rem; border-top: 1px dashed var(--line); padding-top: 10px; }
+.fc .a .proof { display: block; margin-top: 6px; font-family: var(--mono); font-size: .74rem; color: var(--muted); }
+.fc .hint { font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+.fc.open { border-color: var(--accent); background: var(--accent-soft); }
+.fc.open .hint { display: none; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } html { scroll-behavior: auto; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">MediQueue<small>Design · viva prep</small></div>
+    <nav id="nav">
+      <a href="#architecture">Architecture</a>
+      <a href="#requirements">Requirement → Code</a>
+      <a href="#solid">SOLID &amp; OOP</a>
+      <a href="#live-coding">Live coding</a>
+      <a href="#tradeoffs">Trade-offs</a>
+      <a href="#viva">Viva cards</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">How to use this page in the viva</div>
+    <h1>Every requirement has a concept, a pattern and a file that proves it</h1>
+    <p class="lede">When the examiner asks "how did you handle X?", answer in this order, left to right. Each section below gives you one of these links.</p>
+    <div class="chain">
+      <div><i>1 · the need</i><b>Requirement</b><span>"No double-booking"</span></div>
+      <div><i>2 · the idea</i><b>Concept</b><span>Let the database reject the duplicate</span></div>
+      <div><i>3 · the name</i><b>Pattern / principle</b><span>Constraint-based concurrency</span></div>
+      <div><i>4 · the proof</i><b>File &amp; test</b><span><code>UNIQUE(slot_id)</code> · booking.test.js</span></div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section id="architecture">
+    <div class="head"><div class="eyebrow">§1 · Layered (N-tier) architecture</div><h2>Where each piece lives, and what it may never do</h2>
+      <p class="lede">Requests flow down through the layers. Events flow sideways to the live boards and notifications. Click any box.</p></div>
+    <div class="arch">
+      <div class="panel diagram" id="diagram"></div>
+      <aside class="panel info" id="info"></aside>
+    </div>
+  </section>
+
+  <!-- REQUIREMENTS -->
+  <section id="requirements">
+    <div class="head"><div class="eyebrow">§2 · Requirement → Concept → Code</div><h2>Sixteen requirements, each traced to code</h2>
+      <p class="lede">Filter by pattern to see everything one pattern is responsible for. Rows marked in amber are the ones examiners ask about most.</p></div>
+    <div class="filters" id="filters"><span class="lbl">Pattern</span></div>
+    <div class="colheads"><span>Requirement</span><span></span><span>Concept</span><span></span><span>Pattern</span><span></span><span>Where</span></div>
+    <div class="reqs" id="reqs"></div>
+  </section>
+
+  <!-- SOLID -->
+  <section id="solid">
+    <div class="head"><div class="eyebrow">§3 · SOLID with proof</div><h2>Five principles, five places in the code</h2>
+      <p class="lede">Learn each one as a pair: the one-line meaning, then the concrete class that shows it.</p></div>
+    <div class="solid" id="solidgrid"></div>
+    <div class="head" style="margin-top:8px"><h3>The four OOP pillars</h3></div>
+    <div class="pillars" id="pillars"></div>
+  </section>
+
+  <!-- LIVE CODING -->
+  <section id="live-coding">
+    <div class="head"><div class="eyebrow">§4 · Live-coding practice</div><h2>"Implement this now": what you add and what you touch</h2>
+      <p class="lede">Most tasks only add new classes or change configuration. That is the Open/Closed principle working: existing method bodies stay as they are.</p>
+      <div class="ocp"><span><span class="tag add">ADD</span> new class or method</span><span><span class="tag cfg">WIRE</span> one line in container.js</span><span><span class="tag edit">EDIT</span> existing method changes</span></div></div>
+    <div class="tasks" id="tasks"></div>
+  </section>
+
+  <!-- TRADE-OFFS -->
+  <section id="tradeoffs">
+    <div class="head"><div class="eyebrow">§5 · Key decisions</div><h2>What we chose, what we gave up</h2>
+      <p class="lede">Examiners like "why not X?". Each card gives the choice, the alternative you rejected, the reason, and the honest cost.</p></div>
+    <div class="trades" id="trades"></div>
+  </section>
+
+  <!-- VIVA -->
+  <section id="viva">
+    <div class="head"><div class="eyebrow">§6 · Likely viva questions</div><h2>Test yourself</h2>
+      <p class="lede">Say your answer out loud first, then click the card to check it.</p></div>
+    <div class="cardbar"><div class="progress"><span id="bar"></span></div><span class="count" id="count"></span><button class="btn" id="showall" type="button">Show all answers</button><button class="btn" id="hideall" type="button">Hide all</button></div>
+    <div class="cards" id="cards"></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem('mq-design-' + k); return v == null ? d : v; } catch { return d; } }, set(k, v) { try { localStorage.setItem('mq-design-' + k, v); } catch {} } };
+
+/* ---------- Architecture ---------- */
+const NODES = {
+  browser: { x:20, y:16, w:820, h:52, t:'Browser', s:'Reception UI · Display Board', dark:true,
+    folder:'public/', job:'What people see: the front-desk console and the TV board.', dont:'Hold any rules. It only calls the API and listens for pushes.' },
+  ctrl: { x:20, y:120, w:270, h:56, t:'Controllers', s:'src/controllers',
+    folder:'src/controllers', job:'HTTP in → one service call → JSON out.', dont:'Contain business rules.' },
+  svc: { x:20, y:232, w:270, h:56, t:'Services', s:'src/services',
+    folder:'src/services', job:'Business rules, transactions, publishing events.', dont:'Know about HTTP or write SQL.' },
+  helpers: { x:20, y:330, w:230, h:96, t:'Domain & strategies', s:'',
+    folder:'src/domain · src/strategies', job:'Pure rules: PriorityStrategy (Strategy), CategoryResolver (Chain), Token / TokenState (State), errors.', dont:'Depend on anything outside themselves.' },
+  repo: { x:330, y:330, w:200, h:56, t:'Repositories', s:'SQL only',
+    folder:'src/repositories', job:'Every SQL query lives here, one class per table.', dont:'Contain business rules.' },
+  db: { x:330, y:448, w:200, h:56, t:'SQLite (WAL)', s:'single source of truth', dark:true,
+    folder:'src/infra/Database.js · schema.sql', job:'Stores everything. UNIQUE constraints stop duplicates. WAL keeps committed data safe through a crash.', dont:'Be bypassed: the queue is never kept only in memory.' },
+  bus: { x:330, y:232, w:200, h:56, t:'EventBus', s:'publish / subscribe',
+    folder:'src/infra/EventBus.js', job:'Carries facts like token.called and queue.changed to whoever listens.', dont:'Let one failing listener break the others.' },
+  sock: { x:580, y:120, w:260, h:56, t:'SocketGateway', s:'WebSocket push',
+    folder:'src/infra/SocketGateway.js', job:'Pushes the live queue to each doctor\'s board and the load summary to admins.', dont:'Change data. It only reads and pushes.' },
+  notif: { x:580, y:232, w:260, h:56, t:'NotificationService', s:'TURN_NEAR · CALLED',
+    folder:'src/services/NotificationService.js', job:'Tells patients their turn is near or they are called, once per channel.', dont:'Retry forever or crash the queue if SMS fails.' },
+  notifiers: { x:580, y:330, w:260, h:56, t:'Notifiers', s:'Console · SMS · …',
+    folder:'src/notifications/notifiers.js', job:'One class per channel, all with the same send() + channel.', dont:'Know about queues or tokens.' },
+  root: { x:580, y:448, w:260, h:56, t:'container.js', s:'builds & wires everything', root:true,
+    folder:'src/container.js', job:'The composition root: creates every object once and passes in its dependencies.', dont:'Be skipped: no class creates its own collaborators with new.' },
+};
+const EDGES = [
+  ['browser','ctrl','HTTP (REST)','v'], ['sock','browser','WebSocket push','v', true],
+  ['ctrl','svc','calls','v'], ['svc','helpers','uses','v'], ['svc','bus','publishes','h', true],
+  ['bus','sock','subscribes','e', true], ['bus','notif','subscribes','h', true], ['notif','notifiers','send()','v'],
+  ['svc','repo','reads / writes','d'], ['repo','db','SQL','v'],
+];
+let selN = store.get('node', 'svc');
+if (!NODES[selN]) selN = 'svc';
+function drawArch() {
+  const W = 860, H = 520;
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="MediQueue layered architecture"><defs>
+    <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+    <marker id="mev" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk-ev"/></marker></defs>`;
+  EDGES.forEach(([a, b, l, mode, ev]) => {
+    const A = NODES[a], B = NODES[b];
+    let d, tx, ty, anchor = 'start';
+    if (a === 'sock' && b === 'browser') { const x = A.x + A.w / 2; d = `M${x},${A.y} V${B.y + B.h + 3}`; tx = x + 8; ty = (A.y + B.y + B.h) / 2 + 4; }
+    else if (a === 'browser') { const x = B.x + B.w / 2; d = `M${x},${A.y + A.h} V${B.y - 3}`; tx = x + 8; ty = (A.y + A.h + B.y) / 2 + 4; }
+    else if (mode === 'v') { const x = A.x + A.w / 2; d = `M${x},${A.y + A.h} V${B.y - 3}`; tx = x + 8; ty = (A.y + A.h + B.y) / 2 + 4; }
+    else if (mode === 'h') { const y = A.y + A.h / 2; d = `M${A.x + A.w},${y} H${B.x - 3}`; tx = (A.x + A.w + B.x) / 2; ty = y - 7; anchor = 'middle'; }
+    else if (mode === 'e') { const x0 = A.x + A.w / 2, y0 = A.y, y1 = B.y + B.h / 2; d = `M${x0},${y0} V${y1} H${B.x - 3}`; tx = x0 + 8; ty = y1 - 7; }
+    else { const x0 = A.x + A.w - 20, y0 = A.y + A.h, y1 = B.y + B.h / 2; d = `M${x0},${y0} V${y1} H${B.x - 3}`; tx = x0 + 8; ty = y0 + 26; }
+    s += `<g class="e${ev ? ' ev' : ''}"><path d="${d}" marker-end="url(#${ev ? 'mev' : 'm'})"/><text x="${tx}" y="${ty}" text-anchor="${anchor}">${l}</text></g>`;
+  });
+  Object.entries(NODES).forEach(([k, n]) => {
+    const cls = ['n', n.dark ? 'dark' : '', n.root ? 'root' : '', k === selN ? 'sel' : ''].join(' ');
+    s += `<g class="${cls}" data-node="${k}" tabindex="0" role="button" aria-label="${esc(n.t)}"><rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="6"/>`;
+    if (k === 'helpers') {
+      s += `<text x="${n.x + 14}" y="${n.y + 22}">${esc(n.t)}</text>`;
+      ['PriorityStrategy · Strategy','CategoryResolver · Chain','Token/TokenState · State'].forEach((l, i) => s += `<text class="s" x="${n.x + 14}" y="${n.y + 44 + i * 17}">${l}</text>`);
+    } else {
+      s += `<text x="${n.x + n.w / 2}" y="${n.y + (n.s ? 24 : 32)}" text-anchor="middle">${esc(n.t)}</text>`;
+      if (n.s) s += `<text class="s" x="${n.x + n.w / 2}" y="${n.y + 42}" text-anchor="middle">${esc(n.s)}</text>`;
+    }
+    s += '</g>';
+  });
+  s += '</svg>';
+  $('#diagram').innerHTML = s + `<div class="legend"><span>request / data flow</span><span class="ev">event (after commit)</span></div>`;
+  const n = NODES[selN];
+  $('#info').innerHTML = `<div class="eyebrow">Selected</div><h2 style="font-size:1.4rem">${esc(n.t)}</h2><div class="folder">${esc(n.folder)}</div>
+    <div class="dos"><div class="do"><b>✓</b><span><strong>Its job.</strong> ${esc(n.job)}</span></div><div class="dont"><b>✕</b><span><strong>Must not.</strong> ${esc(n.dont)}</span></div></div>`;
+}
+
+/* ---------- Requirements ---------- */
+const REQS = [
+  ['Doctor schedules, slot booking','Slot = (doctor, time) with a UNIQUE key','Repository','DoctorService.generateSlots · SlotRepository'],
+  ['No double-booking with many receptionists','Concurrency by DB constraint, not "check then insert" (that has a race window)','—','schema.sql UNIQUE(slot_id) · AppointmentService.book → 409', true],
+  ['Unique token numbers under concurrency','Serialised writes with BEGIN IMMEDIATE','—','Database.transaction · QueueService.#issue'],
+  ['Emergency > Senior > Appointment > Walk-in','Order by a priority score','Strategy','strategies/priority.js · CategoryPriorityStrategy', true],
+  ['Lower priority never waits forever','Aging: points for every minute waited','Decorator','AgingPriorityStrategy', true],
+  ['Decide a patient\'s category','Ordered rules, first match wins','Chain','strategies/categoryRules.js'],
+  ['Waiting → Called → In Consultation → Done / No-Show','Finite state machine','State','domain/TokenState.js · domain/Token.js', true],
+  ['Wait-time estimate','(people ahead + 1 if doctor busy) × avg consult mins','—','QueueService.getQueue'],
+  ['Notify as turn approaches','Event-driven publish / subscribe','Observer','infra/EventBus.js · NotificationService.js', true],
+  ['No duplicate notifications','Idempotency via UNIQUE(token, type, channel)','—','notifications table · NotificationRepository.record'],
+  ['Real-time display boards','WebSocket push, one room per doctor','Observer','infra/SocketGateway.js · public/board.html'],
+  ['Admin sees queue load','Aggregated read model','—','QueueService.summary · GET /api/queues'],
+  ['Consistent & recoverable after failure','ACID + WAL; the DB is the only source of truth','—','Database.js · test "a token never lost after a crash"', true],
+  ['Consultation & prescription history','Persistent history','Repository','ConsultationRepository · GET /api/patients/:id/history'],
+  ['Add rules / categories / channels without editing code','Extensibility','Open/Closed','container.js · see Live coding'],
+  ['Testability','Inject time instead of new Date()','Dependency Inversion','infra/Clock.js · test/helpers.js FakeClock'],
+];
+const PATS = ['All', 'Strategy', 'Decorator', 'Chain', 'State', 'Observer', 'Repository', 'Open/Closed', 'Dependency Inversion', 'DB constraint'];
+let pat = 'All';
+function drawReqs() {
+  $('#filters').innerHTML = '<span class="lbl">Pattern</span>' + PATS.map(p => `<button class="chip${p === pat ? ' on' : ''}" data-pat="${esc(p)}" type="button">${esc(p)}</button>`).join('');
+  const rows = REQS.filter(r => pat === 'All' || (pat === 'DB constraint' ? /UNIQUE|BEGIN|ACID/.test(r[1] + r[3]) : r[2] === pat));
+  $('#reqs').innerHTML = rows.map(([need, concept, p, where, star]) => `<div class="req${star ? ' star' : ''}">
+    <div class="need">${esc(need)}</div><div class="arrow">→</div><div class="concept">${esc(concept)}</div><div class="arrow">→</div>
+    <div class="pat">${p === '—' ? '<span class="none">no named pattern</span>' : `<span>${esc(p === 'Chain' ? 'Chain of Resp.' : p)}</span>`}</div><div class="arrow">→</div>
+    <div class="where">${esc(where)}</div></div>`).join('');
+}
+
+/* ---------- SOLID ---------- */
+const SOLID = [
+  ['S','Single Responsibility','One class, one reason to change.','SlotRepository only does slot SQL. NotificationService only notifies. SocketGateway only pushes to boards.'],
+  ['O','Open / Closed','Extend by adding, not editing.','New channel = new Notifier subclass. New category = register() + new CategoryRule. New priority = new PriorityStrategy.'],
+  ['L','Liskov Substitution','A subclass works wherever the parent is expected.','NotificationService loops over any Notifier (Console, SMS, the test\'s InMemory). QueueService works with any PriorityStrategy.'],
+  ['I','Interface Segregation','Small, focused interfaces.','Notifier = send() + channel. PriorityStrategy = score(). CategoryRule = resolve().'],
+  ['D','Dependency Inversion','Depend on abstractions; receive dependencies.','Every service gets repos, clock and eventBus through its constructor. Tests swap in FakeClock + InMemoryNotifier with zero code changes.'],
+];
+const PILLARS = [
+  ['Encapsulation','#private fields and methods hide internals.','EventBus.#handlers, QueueService.#apply'],
+  ['Inheritance','Subclasses reuse and specialise a base.','WaitingState extends TokenState, SmsNotifier extends Notifier'],
+  ['Polymorphism','Same call, different behaviour.','token.call() depends on the current state object'],
+  ['Abstraction','Base classes define the contract and throw "must be implemented".','Notifier, PriorityStrategy, CategoryRule'],
+];
+function drawSolid() {
+  $('#solidgrid').innerHTML = SOLID.map(([L, n, m, p]) => `<div class="letter"><div class="L">${L}</div><h3>${n}</h3><p class="mean">${esc(m)}</p><p class="proof">${esc(p)}</p></div>`).join('');
+  $('#pillars').innerHTML = PILLARS.map(([n, m, p]) => `<div class="pillar"><h3>${n}</h3><p>${esc(m)}</p><code>${esc(p)}</code></div>`).join('');
+}
+
+/* ---------- Live coding ---------- */
+const TASKS = [
+  ['Add WhatsApp notifications','Write class WhatsAppNotifier extends Notifier, then add it to the notifiers list.',[['notifiers.js','add'],['container.js','cfg']]],
+  ['Add a PREGNANT category above Senior','categories.register(\'PREGNANT\', 350), a PregnancyRule placed before SeniorCitizenRule, and an isPregnant flag on walk-in.',[['categoryRules.js','add'],['container.js','cfg'],['QueueService.issueWalkIn','edit']]],
+  ['Make aging faster','Change agingPointsPerMinute to 5. One number.',[['container.js','cfg']]],
+  ['Children under 5 get priority','Write class ChildRule extends CategoryRule and register a CHILD category.',[['categoryRules.js','add'],['container.js','cfg']]],
+  ['Allow a no-show patient to rejoin','Add requeue() to NoShowState returning WAITING, add Token.requeue(), and a route.',[['TokenState.js','add'],['Token.js','add'],['QueueController.js','add']]],
+  ['Cancel an appointment','AppointmentRepository.delete + AppointmentService.cancel + a route.',[['AppointmentRepository.js','add'],['AppointmentService.js','add'],['AppointmentController.js','add']]],
+];
+const TAGS = { add:'ADD', cfg:'WIRE', edit:'EDIT' };
+function drawTasks() {
+  $('#tasks').innerHTML = TASKS.map(([ask, how, files]) => {
+    const edits = files.filter(f => f[1] === 'edit').length;
+    return `<div class="task"><div class="ask">"${esc(ask)}"</div><p class="how">${esc(how)}</p>
+      <div class="files">${files.map(([f, k]) => `<div class="file"><span>${esc(f)}</span><span class="tag ${k}">${TAGS[k]}</span></div>`).join('')}</div>
+      <div class="verdict">${edits ? `${edits} existing method changed (it must accept the new flag)` : '<b>0</b> existing method bodies changed'}</div></div>`;
+  }).join('');
+}
+
+/* ---------- Trade-offs ---------- */
+const TRADES = [
+  ['SQLite','Postgres / Redis','One hospital server, zero setup, full ACID. All SQL sits in repositories, so moving to Postgres changes only src/repositories and Database.js.','Not built for many servers writing at once.'],
+  ['Rebuild the queue from the DB on every read','An in-memory heap','Nothing to lose in a crash and no cache to keep in sync. A doctor\'s day is tens of indexed rows, so it is fast enough.','Slightly more work per read.'],
+  ['Database constraints for concurrency','Locks in application code','A lock in Node memory protects only one process. A UNIQUE constraint protects every writer.','Errors must be translated (UNIQUE failure → 409).'],
+  ['Weights 1000 / 300 / 200 / 100, +2 pts per minute','Pure priority, or pure first-come','A walk-in overtakes a newly arrived appointment after 50 extra minutes. Emergency is effectively never overtaken.','The numbers are a policy choice that may need tuning.'],
+  ['One patient with the doctor at a time','Calling several patients ahead','callNext refuses while someone is CALLED or IN_CONSULTATION, so the board is never ambiguous.','Receptionist must complete or mark no-show before calling next.'],
+  ['At-most-once notifications','At-least-once with retries','Record first, then send, so a patient never gets the same SMS twice.','A failed SMS is logged, not retried. Production would add an outbox retry queue.'],
+  ['Publish events after commit','Publish during the transaction','Boards and SMS only ever see data that was really saved.','Listeners react just after the save, never during it.'],
+];
+function drawTrades() {
+  $('#trades').innerHTML = TRADES.map(([pick, over, why, cost], i) => `<div class="trade"><div class="no">${i + 1}</div>
+    <div><span class="k">We chose</span><div class="pick">${esc(pick)}</div></div>
+    <div><span class="k">Instead of</span><div class="over">${esc(over)}</div></div>
+    <div><span class="k">Because</span><div class="why">${esc(why)}</div><div class="cost">Cost: ${esc(cost)}</div></div></div>`).join('');
+}
+
+/* ---------- Viva cards ---------- */
+const QA = [
+  ['Two receptionists book the same slot at the same moment. What happens?','Both INSERTs reach SQLite. UNIQUE(slot_id) accepts one and rejects the other, which we return as 409 Conflict.','booking.test.js · "two receptionists racing"'],
+  ['Why not check "is the slot free?" first?','Race condition: both could read "free" before either writes. The constraint check is atomic.','schema.sql · UNIQUE(slot_id)'],
+  ['The server crashes mid-day. What is lost?','Nothing committed. Every status change is a transaction in a WAL-mode database, and the queue is rebuilt from the tables.','queue.test.js · "a token never lost after a crash"'],
+  ['How do you stop walk-ins waiting forever?','The aging decorator adds points for every minute waited, so long-waiting patients rise.','AgingPriorityStrategy · priority.test.js'],
+  ['Why the State pattern instead of if/else on status?','Each state lists only its legal moves. Illegal jumps throw automatically, and adding a state does not touch the others.','domain/TokenState.js · tokenState.test.js'],
+  ['Why an Observer / EventBus?','QueueService does not know boards or SMS exist. A new listener, like analytics, needs no change to QueueService.','infra/EventBus.js'],
+  ['What is Dependency Injection here?','container.js builds every object and passes dependencies into constructors. Tests pass a fake clock to "time-travel" for the aging test.','container.js · test/helpers.js'],
+  ['How is the wait time estimated?','(people ahead of you + 1 if the doctor is busy) × the doctor\'s average consultation minutes.','QueueService.getQueue'],
+  ['How would you scale to many hospitals?','Postgres instead of SQLite, Redis Pub/Sub instead of the in-process EventBus so servers share events, the socket.io Redis adapter, and partitioning by hospital id.','Repository layer means only repos + Database change'],
+];
+let open = new Set(JSON.parse(store.get('open', '[]')));
+function drawCards() {
+  $('#cards').innerHTML = QA.map(([q, a, p], i) => `<button class="fc${open.has(i) ? ' open' : ''}" data-card="${i}" type="button" aria-expanded="${open.has(i)}">
+    <span class="qn">Q${i + 1}</span><span class="q">${esc(q)}</span>
+    ${open.has(i) ? `<span class="a">${esc(a)}<span class="proof">Proof: ${esc(p)}</span></span>` : '<span class="hint">Click to reveal the answer</span>'}</button>`).join('');
+  $('#count').textContent = `${open.size} / ${QA.length} revealed`;
+  $('#bar').style.width = (open.size / QA.length * 100) + '%';
+  store.set('open', JSON.stringify([...open]));
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click', e => {
+  const n = e.target.closest('[data-node]');
+  if (n) { selN = n.dataset.node; store.set('node', selN); drawArch(); return; }
+  const p = e.target.closest('[data-pat]');
+  if (p) { pat = p.dataset.pat; drawReqs(); return; }
+  const c = e.target.closest('[data-card]');
+  if (c) { const i = Number(c.dataset.card); open.has(i) ? open.delete(i) : open.add(i); drawCards(); return; }
+  if (e.target.id === 'showall') { open = new Set(QA.map((_, i) => i)); drawCards(); }
+  if (e.target.id === 'hideall') { open = new Set(); drawCards(); }
+});
+document.addEventListener('keydown', e => {
+  const n = e.target.closest && e.target.closest('[data-node]');
+  if (n && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selN = n.dataset.node; store.set('node', selN); drawArch(); const el = document.querySelector(`[data-node="${selN}"]`); if (el) el.focus(); }
+});
+const secs = [...document.querySelectorAll('main section[id]')];
+const links = [...document.querySelectorAll('#nav a')];
+const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => {
+  es.forEach(en => { if (en.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + en.target.id)); });
+}, { rootMargin: '-40% 0px -55% 0px' }) : null;
+if (io) secs.forEach(s => io.observe(s));
+
+drawArch(); drawReqs(); drawSolid(); drawTasks(); drawTrades(); drawCards();
+</script>

@@ -1,0 +1,922 @@
+<title>MediQueue LLD Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: sticky ward-board tab bar over one view at a time; every view links back into the class map (traceability). */
+:root {
+  --bg: #eef2f0;
+  --surface: #ffffff;
+  --sunk: #e3e9e6;
+  --line: #cdd7d2;
+  --ink: #13201c;
+  --muted: #56655f;
+  --accent: #0b6e66;
+  --accent-soft: #d3ebe7;
+  --board: #10201c;
+  --board-ink: #e9f5f1;
+  --emerg: #c4362c;
+  --senior: #b8730a;
+  --appt: #2a5fb0;
+  --walkin: #5f6f68;
+  --ok: #217a45;
+  --bad: #b3261e;
+  --bad-soft: #f8dedb;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1513; --surface: #15211e; --sunk: #1b2925; --line: #2c3d38; --ink: #e2ece8; --muted: #93a7a0;
+    --accent: #4cc2b5; --accent-soft: #173a35; --board: #07100e; --board-ink: #d8f1ea;
+    --emerg: #f0766b; --senior: #e3a33f; --appt: #7aa7ec; --walkin: #9aaba4; --ok: #5dc488; --bad: #f2847b; --bad-soft: #3b1d1b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1513; --surface: #15211e; --sunk: #1b2925; --line: #2c3d38; --ink: #e2ece8; --muted: #93a7a0;
+  --accent: #4cc2b5; --accent-soft: #173a35; --board: #07100e; --board-ink: #d8f1ea;
+  --emerg: #f0766b; --senior: #e3a33f; --appt: #7aa7ec; --walkin: #9aaba4; --ok: #5dc488; --bad: #f2847b; --bad-soft: #3b1d1b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--board); }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h2 { font-size: 1.6rem; font-weight: 750; font-stretch: 88%; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* header / board */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--board); color: var(--board-ink); }
+.top .wrap { display: flex; align-items: center; gap: 18px; padding-block: 10px; }
+.brand { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+.brand b { font-family: var(--display); font-weight: 800; font-stretch: 75%; font-size: 1.35rem; letter-spacing: .01em; }
+.brand span { font-family: var(--mono); font-size: .72rem; opacity: .7; text-transform: uppercase; letter-spacing: .08em; }
+nav.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+nav.tabs::-webkit-scrollbar { display: none; }
+nav.tabs a { color: inherit; text-decoration: none; font-family: var(--mono); font-size: .8rem; padding: 7px 11px; border-radius: 4px; white-space: nowrap; opacity: .72; }
+nav.tabs a:hover { opacity: 1; background: rgba(255,255,255,.07); }
+nav.tabs a[aria-current="page"] { opacity: 1; background: var(--accent); color: #fff; }
+@media (max-width: 720px) { .top .wrap { flex-direction: column; align-items: stretch; gap: 6px; } .brand span { display: none; } }
+
+main { padding-block: 28px 64px; }
+.view { display: grid; gap: 22px; }
+.lede { max-width: 68ch; color: var(--muted); }
+.head { display: grid; gap: 8px; }
+.eyebrow { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px; min-width: 0; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: .74rem; padding: 2px 8px; border-radius: 3px; background: var(--sunk); color: var(--ink); border: 1px solid transparent; cursor: pointer; white-space: nowrap; }
+.chip:hover { border-color: var(--accent); }
+.chip.static { cursor: default; }
+.chip.static:hover { border-color: transparent; }
+.chip.on { background: var(--accent); color: #fff; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: .86rem; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.scroll-x { overflow-x: auto; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: .9rem; }
+.kv dt { color: var(--muted); font-family: var(--mono); font-size: .76rem; padding-top: 2px; }
+.kv dd { margin: 0; min-width: 0; }
+
+/* overview */
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: .9rem; color: var(--muted); }
+.facts b { font-family: var(--display); font-size: 1.25rem; color: var(--ink); font-stretch: 80%; margin-right: 4px; }
+.stack { display: grid; grid-template-columns: 1fr 64px; gap: 10px; }
+.layers { display: grid; gap: 6px; }
+.layer { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: start; padding: 12px 14px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
+.layer .name { font-family: var(--display); font-weight: 700; font-stretch: 85%; }
+.layer .name small { display: block; font-family: var(--body); font-weight: 400; font-size: .78rem; color: var(--muted); font-stretch: 100%; }
+.layer.split { grid-template-columns: 150px 1fr 1fr; }
+.layer .sub { font-family: var(--mono); font-size: .7rem; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em; }
+.flowdown { text-align: center; font-family: var(--mono); font-size: .7rem; color: var(--muted); line-height: 1; }
+.rootbar { writing-mode: vertical-rl; transform: rotate(180deg); background: var(--accent-soft); border: 1px dashed var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--mono); font-size: .78rem; color: var(--accent); cursor: pointer; padding: 10px 0; }
+@media (max-width: 720px) {
+  .stack { grid-template-columns: 1fr; }
+  .rootbar { writing-mode: horizontal-tb; transform: none; padding: 10px; }
+  .layer, .layer.split { grid-template-columns: 1fr; gap: 8px; }
+}
+.contract { font-family: var(--mono); font-size: .8rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.contract span { padding: 3px 8px; background: var(--sunk); border-radius: 3px; }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.rules .panel p { color: var(--muted); font-size: .9rem; margin-top: 6px; }
+
+/* classes */
+.cls-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .cls-grid { grid-template-columns: 1fr; } }
+.lens { display: grid; gap: 10px; }
+.lens .label { font-family: var(--mono); font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.pkg { display: grid; gap: 6px; }
+.pkg + .pkg { margin-top: 14px; }
+.pkg h4 { margin: 0; font-family: var(--mono); font-size: .74rem; color: var(--muted); font-weight: 500; }
+.cards { display: flex; flex-wrap: wrap; gap: 6px; }
+.cls { font-family: var(--mono); font-size: .8rem; padding: 6px 9px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; text-align: left; }
+.cls i { font-style: normal; font-size: .66rem; color: var(--muted); margin-left: 4px; }
+.cls:hover { border-color: var(--accent); }
+.cls.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+.cls.sel i { color: #fff; opacity: .8; }
+.cls.hit { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.cls.dim { opacity: .32; }
+.cls.rel { border-style: dashed; border-color: var(--accent); }
+.detail { position: sticky; top: 76px; display: grid; gap: 14px; }
+.detail .kind { font-family: var(--mono); font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; }
+.detail h3 { font-size: 1.5rem; font-stretch: 85%; }
+.methods { font-family: var(--mono); font-size: .8rem; background: var(--sunk); border-radius: 5px; padding: 10px 12px; display: grid; gap: 2px; overflow-x: auto; }
+.methods .priv { color: var(--muted); }
+.lensnote { font-size: .88rem; color: var(--muted); border-left: 3px solid var(--accent); padding-left: 10px; }
+
+/* sequence */
+.flowpick { display: flex; flex-wrap: wrap; gap: 6px; }
+.seqbox { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+.seqbox svg { display: block; }
+.seq-part rect { fill: var(--board); }
+.seq-part text { fill: var(--board-ink); font-family: var(--mono); font-size: 11px; }
+.seq-life { stroke: var(--line); stroke-dasharray: 4 4; }
+.seq-msg line, .seq-msg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.seq-msg text { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+.seq-msg.ret line { stroke-dasharray: 5 4; }
+.seq-msg.future { opacity: .18; }
+.seq-msg.cur line, .seq-msg.cur path { stroke: var(--accent); stroke-width: 2.4; }
+.seq-msg.cur text { fill: var(--ink); font-weight: 700; }
+.seq-msg.err.cur line, .seq-msg.err.cur path { stroke: var(--bad); }
+.seq-msg .num { fill: var(--accent); font-weight: 700; }
+.seq-act { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1; }
+.mk-past { fill: var(--muted); } .mk-cur { fill: var(--accent); } .mk-err { fill: var(--bad); }
+.stepper { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
+.stepnum { font-family: var(--display); font-weight: 800; font-stretch: 75%; font-size: 2.4rem; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 2.2ch; }
+.stepnote b { font-family: var(--mono); font-size: .86rem; }
+.stepnote p { margin-top: 4px; color: var(--muted); max-width: 70ch; }
+
+/* lifecycle */
+.life { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 900px) { .life { grid-template-columns: 1fr; } }
+.sm-node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.sm-node text { fill: var(--ink); font-family: var(--mono); font-size: 12px; font-weight: 700; }
+.sm-node.term rect { stroke-dasharray: 5 3; }
+.sm-node.cur rect { fill: var(--accent); stroke: var(--accent); }
+.sm-node.cur text { fill: #fff; }
+.sm-edge path { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.sm-edge text { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+.sm-edge.live path { stroke: var(--accent); stroke-width: 2.5; }
+.sm-edge.live text { fill: var(--accent); font-weight: 700; }
+.mk-sm { fill: var(--muted); }
+.log { font-family: var(--mono); font-size: .78rem; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
+.log div { padding: 5px 8px; border-radius: 4px; background: var(--sunk); }
+.log .bad { background: var(--bad-soft); color: var(--bad); }
+.log .good { color: var(--ok); }
+
+/* priority */
+.prio { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .prio { grid-template-columns: 1fr; } }
+.board { background: var(--board); color: var(--board-ink); border-radius: 8px; padding: 16px; display: grid; gap: 12px; }
+.board-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.clock { font-family: var(--mono); font-size: 1.7rem; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.board label { font-family: var(--mono); font-size: .72rem; opacity: .75; }
+.board input[type=range] { width: 100%; accent-color: var(--accent); }
+.qrow { display: grid; grid-template-columns: 28px 52px minmax(0, 1fr) 72px; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 5px; background: rgba(255,255,255,.05); transition: transform .25s; }
+.qrow .pos { font-family: var(--mono); opacity: .6; font-size: .8rem; }
+.qrow .tok { font-family: var(--mono); font-weight: 700; font-size: 1.15rem; }
+.qrow .who { min-width: 0; }
+.qrow .who b { font-weight: 600; }
+.qrow .who small { display: block; font-family: var(--mono); font-size: .7rem; opacity: .7; }
+.bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.1); margin-top: 5px; overflow: hidden; display: flex; }
+.bar span { display: block; height: 100%; }
+.bar .age { background: repeating-linear-gradient(45deg, var(--board-ink) 0 3px, transparent 3px 6px); opacity: .55; }
+.qrow .score { font-family: var(--mono); text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.qrow .score small { display: block; font-weight: 400; font-size: .68rem; opacity: .7; }
+.cat { display: inline-block; font-family: var(--mono); font-size: .64rem; font-weight: 700; padding: 1px 5px; border-radius: 2px; color: #fff; margin-left: 6px; vertical-align: 1px; }
+.c-EMERGENCY { background: var(--emerg); } .c-SENIOR { background: var(--senior); } .c-APPOINTMENT { background: var(--appt); } .c-WALKIN { background: var(--walkin); }
+.seg { display: inline-flex; border: 1px solid rgba(255,255,255,.2); border-radius: 4px; overflow: hidden; }
+.seg button { background: transparent; border: 0; color: var(--board-ink); font-family: var(--mono); font-size: .74rem; padding: 4px 9px; cursor: pointer; }
+.seg button.on { background: var(--accent); color: #fff; }
+.form { display: grid; gap: 10px; }
+.form .f { display: grid; gap: 4px; }
+.form label { font-size: .8rem; color: var(--muted); }
+.form input[type=text], .form input[type=number] { font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--ink); width: 100%; }
+.form .checks { display: flex; gap: 16px; flex-wrap: wrap; font-size: .88rem; }
+.chain { display: grid; gap: 4px; font-family: var(--mono); font-size: .78rem; }
+.chain div { display: flex; justify-content: space-between; gap: 8px; padding: 6px 9px; border-radius: 4px; background: var(--sunk); }
+.chain .won { background: var(--accent); color: #fff; }
+.chain .skip { opacity: .4; }
+.weights { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; font-family: var(--mono); font-size: .74rem; }
+.weights div { padding: 8px 4px; border-radius: 4px; background: var(--sunk); }
+.weights b { display: block; font-size: 1rem; }
+
+/* data */
+.er svg { display: block; }
+.er-node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; cursor: pointer; }
+.er-node text { fill: var(--ink); font-family: var(--mono); font-size: 12px; font-weight: 700; pointer-events: none; }
+.er-node.sel rect { fill: var(--accent); stroke: var(--accent); }
+.er-node.sel text { fill: #fff; }
+.er-edge line { stroke: var(--muted); stroke-width: 1.3; }
+.er-edge.uniq line { stroke: var(--accent); stroke-width: 2; }
+.er-edge text { fill: var(--muted); font-family: var(--mono); font-size: 10px; }
+.er-edge rect { fill: var(--bg); }
+.tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.tcard { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.tcard.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.tcard header { background: var(--board); color: var(--board-ink); font-family: var(--mono); font-weight: 700; font-size: .84rem; padding: 8px 12px; display: flex; justify-content: space-between; }
+.tcard ul { list-style: none; margin: 0; padding: 6px 0; font-family: var(--mono); font-size: .78rem; }
+.tcard li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 12px; }
+.tcard li span:last-child { color: var(--muted); }
+.k { font-size: .62rem; font-weight: 700; padding: 0 4px; border-radius: 2px; margin-left: 4px; }
+.k.pk { background: var(--accent); color: #fff; } .k.fk { background: var(--sunk); color: var(--ink); border: 1px solid var(--line); } .k.uq { background: var(--senior); color: #fff; }
+.cons { border-top: 1px solid var(--line); padding: 10px 12px; display: grid; gap: 8px; font-size: .82rem; }
+.cons code { color: var(--accent); }
+.cons p { color: var(--muted); }
+
+/* tables (api, trace) */
+.tbl { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.tbl th { text-align: left; font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl td.path { font-family: var(--mono); font-size: .8rem; white-space: nowrap; }
+.m { font-family: var(--mono); font-size: .7rem; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+.m.GET { background: var(--accent-soft); color: var(--accent); } .m.POST { background: var(--appt); color: #fff; }
+.st { font-family: var(--mono); font-size: .74rem; white-space: nowrap; }
+.st .e { color: var(--bad); }
+.search { font: inherit; padding: 8px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(100%, 360px); }
+.fr { font-family: var(--mono); font-weight: 700; color: var(--accent); white-space: nowrap; }
+.traceflow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: .76rem; color: var(--muted); }
+.traceflow span { background: var(--surface); border: 1px solid var(--line); padding: 3px 8px; border-radius: 3px; color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><b>MediQueue</b><span>Low-level design</span></div>
+    <nav class="tabs" id="tabs" aria-label="Design views"></nav>
+  </div>
+</header>
+
+<main class="wrap" id="main"></main>
+
+<script>
+/* ===================== DATA (mirrors LLD.md and src/) ===================== */
+const LAYERS = [
+  { id: 'ctrl', name: 'Controllers', note: 'HTTP in / out. Parse only.' },
+  { id: 'svc', name: 'Services', note: 'Business rules, transactions, events.' },
+  { id: 'dom', name: 'Domain', note: 'Token, states, categories, errors.' },
+  { id: 'strat', name: 'Strategies', note: 'Swappable rules.' },
+  { id: 'notif', name: 'Notifications', note: 'Delivery channels.' },
+  { id: 'repo', name: 'Repositories', note: 'All SQL lives here.' },
+  { id: 'infra', name: 'Infrastructure', note: 'DB, clock, events, sockets.' },
+];
+
+const C = [
+  // controllers
+  { id:'AppointmentController', layer:'ctrl', kind:'class', file:'controllers/AppointmentController.js', role:'Maps /api/appointments routes (book, list today, get, check-in) onto services.', methods:['POST /api/appointments','GET /api/appointments/today','GET /api/appointments/:id','POST /api/appointments/:id/check-in'], deps:['AppointmentService','QueueService'], fr:['FR-4','FR-7'] },
+  { id:'DoctorController', layer:'ctrl', kind:'class', file:'controllers/DoctorController.js', role:'Doctor registration and slot routes.', methods:['POST /api/doctors','GET /api/doctors','POST /api/doctors/:id/slots','GET /api/doctors/:id/slots'], deps:['DoctorService'], fr:['FR-1','FR-2'] },
+  { id:'PatientController', layer:'ctrl', kind:'class', file:'controllers/PatientController.js', role:'Patient registration, lookup and history routes.', methods:['POST /api/patients','GET /api/patients[/:id]','GET /api/patients/:id/history'], deps:['PatientService'], fr:['FR-3','FR-15'] },
+  { id:'QueueController', layer:'ctrl', kind:'class', file:'controllers/QueueController.js', role:'Queue, token lifecycle, categories and notifications routes.', methods:['POST /api/tokens','GET /api/queues[/:doctorId]','POST /api/queues/:doctorId/call-next','POST /api/tokens/:id/{start|complete|no-show}','GET /api/categories','GET /api/notifications'], deps:['QueueService','NotificationService','CategoryRegistry'], fr:['FR-6','FR-10','FR-11','FR-16'] },
+  { id:'HealthController', layer:'ctrl', kind:'class', file:'controllers/HealthController.js', role:'GET /api/health: reports DB tables.', methods:['GET /api/health'], deps:['Database'], fr:[] },
+  { id:'errorHandler', layer:'ctrl', kind:'middleware', file:'controllers/errorHandler.js', role:'Single place that turns any thrown AppError into { error } with its HTTP status. Bad JSON → 400, unknown → 500.', methods:['(err, req, res, next)'], deps:['AppError'], fr:[], solid:['S'] },
+  // services
+  { id:'QueueService', layer:'svc', kind:'class', file:'services/QueueService.js', role:'The live per-doctor queue: issues tokens, orders them by score, moves them through their lifecycle, estimates waits.', methods:['+issueWalkIn(dto)','+checkIn(appointmentId)','+getQueue(doctorId)','+summary()','+callNext(doctorId)','+start(tokenId)','+complete(tokenId, dto)','+noShow(tokenId)','-#issue()','-#order(tokens)','-#apply()','-#transition()'], deps:['TokenRepository','DoctorRepository','PatientRepository','AppointmentRepository','ConsultationRepository','CategoryResolver','PriorityStrategy','EventBus','Database','SystemClock','Token'], fr:['FR-6','FR-7','FR-8','FR-9','FR-10','FR-11','FR-12','FR-16'], patterns:['Strategy','Observer','DI'], solid:['D','L'] },
+  { id:'AppointmentService', layer:'svc', kind:'class', file:'services/AppointmentService.js', role:'Books a free slot. Relies on UNIQUE(slot_id) inside a transaction, so a race becomes a 409, never a double-booking.', methods:['+book(dto)','+get(id)','+listToday()'], deps:['AppointmentRepository','SlotRepository','PatientRepository','Database'], fr:['FR-4','FR-5'], patterns:['DI'] },
+  { id:'DoctorService', layer:'svc', kind:'class', file:'services/DoctorService.js', role:'Registers doctors and generates back-to-back slots (idempotent).', methods:['+create(dto)','+list()','+get(id)','+generateSlots(id, dto)','+availableSlots(id, date)'], deps:['DoctorRepository','SlotRepository'], fr:['FR-1','FR-2'], patterns:['DI'] },
+  { id:'PatientService', layer:'svc', kind:'class', file:'services/PatientService.js', role:'Registers patients and assembles their history.', methods:['+register(dto)','+list()','+get(id)','+history(id)'], deps:['PatientRepository','ConsultationRepository'], fr:['FR-3','FR-15'], patterns:['DI'] },
+  { id:'NotificationService', layer:'svc', kind:'class', file:'services/NotificationService.js', role:'Subscribes to queue events and sends TURN_NEAR / CALLED on every channel, at most once each (recorded before sending).', methods:['+start()','+recent(limit)','-#onCalled(token)','-#onQueueChanged(e)','-#deliver()'], deps:['EventBus','Notifier','NotificationRepository','QueueService'], fr:['FR-13'], patterns:['Observer','DI'], solid:['S','L','O'] },
+  // domain
+  { id:'Token', layer:'dom', kind:'class', file:'domain/Token.js', role:'A queue ticket. Delegates every lifecycle move to its current TokenState.', methods:['+state() TokenState','+call() Token','+start() Token','+complete() Token','+noShow() Token','-#moveTo(state)'], deps:['TokenState'], fr:['FR-10'], patterns:['State'] },
+  { id:'TokenState', layer:'dom', kind:'abstract', file:'domain/TokenState.js', role:'Base state: rejects every move with ConflictError. Each subclass overrides only its legal moves.', methods:['+call()','+start()','+complete()','+noShow()','-#reject(action)'], deps:['ConflictError'], fr:['FR-10'], patterns:['State'], solid:['I','O'] },
+  { id:'WaitingState', layer:'dom', kind:'state', file:'domain/TokenState.js', role:'Only call() is legal → CALLED.', methods:['call() → CALLED'], deps:['TokenState'], fr:['FR-10'], patterns:['State'] },
+  { id:'CalledState', layer:'dom', kind:'state', file:'domain/TokenState.js', role:'start() → IN_CONSULTATION, noShow() → NO_SHOW.', methods:['start() → IN_CONSULTATION','noShow() → NO_SHOW'], deps:['TokenState'], fr:['FR-10'], patterns:['State'] },
+  { id:'InConsultationState', layer:'dom', kind:'state', file:'domain/TokenState.js', role:'Only complete() is legal → DONE.', methods:['complete() → DONE'], deps:['TokenState'], fr:['FR-10'], patterns:['State'] },
+  { id:'DoneState', layer:'dom', kind:'state', file:'domain/TokenState.js', role:'Terminal. Every move rejected by the base class.', methods:['(none)'], deps:['TokenState'], fr:['FR-10'], patterns:['State'] },
+  { id:'NoShowState', layer:'dom', kind:'state', file:'domain/TokenState.js', role:'Terminal. Every move rejected by the base class.', methods:['(none)'], deps:['TokenState'], fr:['FR-10'], patterns:['State'] },
+  { id:'CategoryRegistry', layer:'dom', kind:'class', file:'domain/CategoryRegistry.js', role:'Category → base weight table. A new category is one register() call.', methods:['+register(name, weight)','+has(name)','+weightOf(name)','+list()','-#weights: Map'], deps:[], fr:['FR-8'], patterns:['Registry'], solid:['O'] },
+  { id:'AppError', layer:'dom', kind:'abstract', file:'domain/errors.js', role:'Business error carrying its HTTP status.', methods:['status','message'], deps:[], fr:[] },
+  { id:'ValidationError', layer:'dom', kind:'class', file:'domain/errors.js', role:'400: missing or malformed input.', methods:['status = 400'], deps:['AppError'], fr:[] },
+  { id:'NotFoundError', layer:'dom', kind:'class', file:'domain/errors.js', role:'404: unknown id, or nobody waiting.', methods:['status = 404'], deps:['AppError'], fr:[] },
+  { id:'ConflictError', layer:'dom', kind:'class', file:'domain/errors.js', role:'409: slot taken, illegal transition, doctor busy, double check-in.', methods:['status = 409'], deps:['AppError'], fr:['FR-5','FR-10','FR-11'] },
+  // strategies
+  { id:'PriorityStrategy', layer:'strat', kind:'abstract', file:'strategies/priority.js', role:'Contract: score(token, now). Higher score is served first.', methods:['+score(token, now)'], deps:[], fr:['FR-8'], patterns:['Strategy'], solid:['I','L'] },
+  { id:'CategoryPriorityStrategy', layer:'strat', kind:'class', file:'strategies/priority.js', role:'Score = category base weight (1000 / 300 / 200 / 100).', methods:['+score(token) → weightOf(category)'], deps:['PriorityStrategy','CategoryRegistry'], fr:['FR-8'], patterns:['Strategy'] },
+  { id:'AgingPriorityStrategy', layer:'strat', kind:'decorator', file:'strategies/priority.js', role:'Wraps any strategy and adds 2 points per minute waited, so nobody starves.', methods:['-inner: PriorityStrategy','-pointsPerMinute = 2','+score(token, now) → inner + mins × ppm'], deps:['PriorityStrategy'], fr:['FR-9'], patterns:['Decorator','Strategy'], solid:['O','L'] },
+  { id:'CategoryRule', layer:'strat', kind:'abstract', file:'strategies/categoryRules.js', role:'Contract: resolve(ctx) returns a category or null.', methods:['+resolve(ctx)'], deps:[], fr:['FR-8'], patterns:['Chain'], solid:['I'] },
+  { id:'EmergencyRule', layer:'strat', kind:'class', file:'strategies/categoryRules.js', role:'isEmergency → EMERGENCY.', methods:['+resolve(ctx)'], deps:['CategoryRule'], fr:['FR-8'], patterns:['Chain'] },
+  { id:'SeniorCitizenRule', layer:'strat', kind:'class', file:'strategies/categoryRules.js', role:'age ≥ 60 → SENIOR.', methods:['-minAge = 60','+resolve(ctx)'], deps:['CategoryRule'], fr:['FR-8'], patterns:['Chain'] },
+  { id:'AppointmentRule', layer:'strat', kind:'class', file:'strategies/categoryRules.js', role:'Has appointmentId → APPOINTMENT.', methods:['+resolve(ctx)'], deps:['CategoryRule'], fr:['FR-8'], patterns:['Chain'] },
+  { id:'WalkInRule', layer:'strat', kind:'class', file:'strategies/categoryRules.js', role:'Fallback, always matches → WALKIN. Must be last.', methods:['+resolve() → WALKIN'], deps:['CategoryRule'], fr:['FR-8'], patterns:['Chain'] },
+  { id:'CategoryResolver', layer:'strat', kind:'class', file:'strategies/categoryRules.js', role:'Asks rules in order; the first non-null answer wins.', methods:['-rules: CategoryRule[]','+resolve(ctx) string'], deps:['CategoryRule','CategoryRegistry'], fr:['FR-8'], patterns:['Chain'] },
+  // notifications
+  { id:'Notifier', layer:'notif', kind:'abstract', file:'notifications/notifiers.js', role:'Contract: channel + send(patient, message).', methods:['+channel','+send(patient, message)'], deps:[], fr:['FR-13'], patterns:['Observer'], solid:['I','L','O'] },
+  { id:'ConsoleNotifier', layer:'notif', kind:'class', file:'notifications/notifiers.js', role:'Logs the message to the console.', methods:['channel = CONSOLE','+send()'], deps:['Notifier'], fr:['FR-13'] },
+  { id:'SmsNotifier', layer:'notif', kind:'class', file:'notifications/notifiers.js', role:'SMS channel (simulated).', methods:['channel = SMS','+send()'], deps:['Notifier'], fr:['FR-13'] },
+  // repositories
+  ...['Token','Doctor','Patient','Slot','Appointment','Consultation','Notification'].map(n => ({ id:n+'Repository', layer:'repo', kind:'repository', file:`repositories/${n}Repository.js`, role:`All SQL for the ${n.toLowerCase()}s table. No business rules.`, methods: REPO_METHODS(n), deps:['Database'], fr: REPO_FR(n), patterns:['Repository'], solid:['S'] })),
+  // infra
+  { id:'Database', layer:'infra', kind:'class', file:'infra/Database.js', role:'node:sqlite wrapper. WAL mode, foreign keys on, BEGIN IMMEDIATE transactions. One shared instance.', methods:['+migrate()','+get(sql, params)','+all(sql, params)','+run(sql, params)','+transaction(fn)'], deps:[], fr:['FR-5'], patterns:['Singleton'], nfr:['NFR-1','NFR-2','NFR-8'] },
+  { id:'EventBus', layer:'infra', kind:'class', file:'infra/EventBus.js', role:'In-process pub/sub. A throwing subscriber never affects the others or the publisher.', methods:['+subscribe(event, handler)','+publish(event, payload)','-#handlers'], deps:[], fr:['FR-13','FR-14'], patterns:['Observer'] },
+  { id:'SystemClock', layer:'infra', kind:'class', file:'infra/Clock.js', role:'Injected time source. Tests swap in FakeClock.', methods:['+now() Date'], deps:[], fr:['FR-9','FR-12'], patterns:['DI'], nfr:['NFR-5'] },
+  { id:'SocketGateway', layer:'infra', kind:'class', file:'infra/SocketGateway.js', role:'Pushes live queue to doctor:<id> rooms and load to the summary room on every queue.changed.', methods:['+start()','on watch:doctor','on watch:summary'], deps:['EventBus','QueueService'], fr:['FR-14'], patterns:['Observer'], solid:['S'] },
+  { id:'container', layer:'infra', kind:'composition root', file:'container.js', role:'The one place every object is created and wired. Extending the system happens here.', methods:['buildContainer({ dbFile, clock, notifiers, agingPointsPerMinute })'], deps:['Database','EventBus','SystemClock','CategoryRegistry','CategoryResolver','AgingPriorityStrategy','QueueService','NotificationService'], fr:[], patterns:['DI','Singleton'], solid:['D','O'] },
+];
+function REPO_METHODS(n) {
+  return ({
+    Token: ['+nextTokenNo(doctorId, queueDate)','+create({...})','+findById(id)','+findByAppointment(appointmentId)','+findActive(doctorId, queueDate)','+updateStatus(id, status, updatedAt)'],
+    Doctor: ['+create({name, specialization, avgConsultMins})','+findById(id)','+findAll()'],
+    Patient: ['+create({name, phone, age})','+findById(id)','+findAll()'],
+    Slot: ['+createMany(doctorId, startTimes)','+findById(id)','+findAvailable(doctorId, date)'],
+    Appointment: ['+create({slotId, patientId, createdAt})','+findById(id)','+findByPatient(patientId)','+findByDate(date)'],
+    Consultation: ['+create({tokenId, notes, prescription, createdAt})','+findByPatient(patientId)'],
+    Notification: ['+record({tokenId, type, channel, message, createdAt})','+findByToken(tokenId)','+findRecent(limit = 20)'],
+  })[n];
+}
+function REPO_FR(n) { return ({ Token:['FR-6','FR-10'], Doctor:['FR-1'], Patient:['FR-3'], Slot:['FR-2'], Appointment:['FR-4','FR-5'], Consultation:['FR-15'], Notification:['FR-13'] })[n]; }
+
+const PATTERNS = [
+  { id:'Strategy', kind:'Behavioural', text:'Queue ordering is a swappable policy. QueueService only knows "higher score first".', who:['PriorityStrategy','CategoryPriorityStrategy','AgingPriorityStrategy','QueueService'] },
+  { id:'Decorator', kind:'Structural', text:'Aging adds points per minute on top of any base strategy, without editing it.', who:['AgingPriorityStrategy','PriorityStrategy','CategoryPriorityStrategy'] },
+  { id:'Chain', label:'Chain of Responsibility', kind:'Behavioural', text:'The first matching rule decides a token\'s category. New rules slot into the chain.', who:['CategoryResolver','CategoryRule','EmergencyRule','SeniorCitizenRule','AppointmentRule','WalkInRule'] },
+  { id:'State', kind:'Behavioural', text:'Each state lists only its legal moves; illegal jumps throw automatically.', who:['Token','TokenState','WaitingState','CalledState','InConsultationState','DoneState','NoShowState'] },
+  { id:'Observer', label:'Observer / Pub-Sub', kind:'Behavioural', text:'QueueService publishes facts; notifications and boards react without QueueService knowing they exist.', who:['EventBus','QueueService','NotificationService','SocketGateway','Notifier'] },
+  { id:'Repository', kind:'Structural', text:'All SQL behind method calls. Moving to Postgres touches only repositories and Database.', who:['TokenRepository','DoctorRepository','PatientRepository','SlotRepository','AppointmentRepository','ConsultationRepository','NotificationRepository'] },
+  { id:'Registry', kind:'Creational', text:'Categories and weights live in one open table. A new category is one register() call.', who:['CategoryRegistry'] },
+  { id:'DI', label:'Dependency Injection', kind:'Creational', text:'container.js builds and wires everything; classes receive collaborators through constructors.', who:['container','QueueService','AppointmentService','DoctorService','PatientService','NotificationService','SystemClock'] },
+  { id:'Singleton', label:'Singleton by composition', kind:'Creational', text:'One Database instance created in container.js and shared, with no global or static.', who:['Database','container'] },
+];
+const SOLID = [
+  { id:'S', name:'Single Responsibility', text:'One reason to change: repos = SQL, NotificationService = notifying, SocketGateway = board push, errorHandler = HTTP mapping.' },
+  { id:'O', name:'Open / Closed', text:'Extend by adding a class: new Notifier, new CategoryRule + register(), new PriorityStrategy.' },
+  { id:'L', name:'Liskov Substitution', text:'Any Notifier or PriorityStrategy is interchangeable, including test doubles. Aging wraps a strategy and is still one.' },
+  { id:'I', name:'Interface Segregation', text:'Tiny contracts: score(), resolve(), send() + channel, four lifecycle moves.' },
+  { id:'D', name:'Dependency Inversion', text:'Services depend on injected abstractions. Tests inject FakeClock + InMemoryNotifier with zero production changes.' },
+];
+
+const FRS = [
+  ['FR-1','Register doctors with specialization and avg consult time','DoctorService','—','—','—'],
+  ['FR-2','Generate bookable slots (idempotent)','DoctorService','—','UNIQUE(doctor_id, start_time)','booking.test.js'],
+  ['FR-3','Register patients','PatientService','—','—','—'],
+  ['FR-4','Book an appointment against a free slot','AppointmentService','Repository','—','booking.test.js'],
+  ['FR-5','No double-booking under concurrency','AppointmentService','Repository','UNIQUE(slot_id)','booking.test.js'],
+  ['FR-6','Issue walk-in / emergency token','QueueService','Chain','UNIQUE(doctor_id, queue_date, token_no)','queue.test.js'],
+  ['FR-7','Check an appointment in, once only','QueueService','—','UNIQUE(appointment_id)','queue.test.js'],
+  ['FR-8','Order: Emergency > Senior > Appointment > Walk-in','CategoryResolver','Chain, Strategy, Registry','—','priority.test.js, categoryRules.test.js'],
+  ['FR-9','Prevent starvation (aging)','AgingPriorityStrategy','Decorator','—','priority.test.js'],
+  ['FR-10','Token lifecycle rejects illegal jumps','TokenState','State','CHECK status IN (...)','tokenState.test.js'],
+  ['FR-11','One patient with the doctor at a time','QueueService','—','—','queue.test.js'],
+  ['FR-12','Estimate each waiting patient\'s wait','QueueService','—','—','priority.test.js'],
+  ['FR-13','Notify near / called, once per channel','NotificationService','Observer','UNIQUE(token_id, type, channel)','queue.test.js'],
+  ['FR-14','Real-time boards + admin summary','SocketGateway','Observer','—','—'],
+  ['FR-15','Consultation notes, prescription, history','ConsultationRepository','Repository','UNIQUE(token_id)','queue.test.js'],
+  ['FR-16','Admin load summary across doctors','QueueService','—','—','—'],
+];
+const NFRS = [
+  ['NFR-1','Consistency','ACID; BEGIN IMMEDIATE serialises writes','Database'],
+  ['NFR-2','Durability','SQLite WAL; queue recomputed from DB on every read','Database'],
+  ['NFR-3','Concurrency safety','DB UNIQUE constraints, not in-memory locks','AppointmentService'],
+  ['NFR-4','Extensibility','Add classes in container.js; edit none','container'],
+  ['NFR-5','Testability','Clock and channels injected','SystemClock'],
+  ['NFR-6','Separation of concerns','Controller → Service → Repository','QueueService'],
+  ['NFR-7','Responsiveness','idx_tokens_queue + WebSocket push','SocketGateway'],
+  ['NFR-8','Zero setup','node:sqlite, no DB server','Database'],
+];
+
+const API = [
+  ['GET','/api/health','—','HealthController','200 {ok, tables[]}',''],
+  ['POST','/api/doctors','{name, specialization, avgConsultMins?}','DoctorService.create','201','400'],
+  ['GET','/api/doctors','—','DoctorService.list','200',''],
+  ['POST','/api/doctors/:id/slots','{date, from?, to?, minutes?}','DoctorService.generateSlots','201 {created, available[]}','400 404'],
+  ['GET','/api/doctors/:id/slots','?date=YYYY-MM-DD','DoctorService.availableSlots','200',''],
+  ['POST','/api/patients','{name, phone, age}','PatientService.register','201','400'],
+  ['GET','/api/patients · /:id','—','PatientService.list / get','200','404'],
+  ['GET','/api/patients/:id/history','—','PatientService.history','200 {patient, appointments[], consultations[]}','404'],
+  ['POST','/api/appointments','{slotId, patientId}','AppointmentService.book','201','409 slot booked'],
+  ['GET','/api/appointments/today · /:id','—','AppointmentService.listToday / get','200','404'],
+  ['POST','/api/appointments/:id/check-in','—','QueueService.checkIn','201 token','409 already checked in'],
+  ['POST','/api/tokens','{doctorId, patientId, isEmergency?}','QueueService.issueWalkIn','201 token','400 404'],
+  ['GET','/api/queues','—','QueueService.summary','200 [load]',''],
+  ['GET','/api/queues/:doctorId','—','QueueService.getQueue','200 {doctor, current[], waiting[]}','404'],
+  ['POST','/api/queues/:doctorId/call-next','—','QueueService.callNext','200 token','404 empty · 409 busy'],
+  ['POST','/api/tokens/:id/start','—','QueueService.start','200','409'],
+  ['POST','/api/tokens/:id/complete','{notes?, prescription?}','QueueService.complete','200','409'],
+  ['POST','/api/tokens/:id/no-show','—','QueueService.noShow','200','409'],
+  ['GET','/api/categories','—','CategoryRegistry.list','200 [{name, weight}]',''],
+  ['GET','/api/notifications','?limit=','NotificationService.recent','200',''],
+];
+
+const TABLES = [
+  { id:'doctors', cols:[['id','int','pk'],['name','text'],['specialization','text'],['avg_consult_mins','int']], cons:[] },
+  { id:'patients', cols:[['id','int','pk'],['name','text'],['phone','text'],['age','int']], cons:[] },
+  { id:'slots', cols:[['id','int','pk'],['doctor_id','int','fk'],['start_time','text']], cons:[['UNIQUE(doctor_id, start_time)','A doctor cannot have two slots in the same minute; makes slot generation idempotent.','FR-2']] },
+  { id:'appointments', cols:[['id','int','pk'],['slot_id','int','fk uq'],['patient_id','int','fk'],['created_at','text']], cons:[['UNIQUE(slot_id)','Prevents double-booking atomically. The losing receptionist gets 409.','FR-5']] },
+  { id:'tokens', cols:[['id','int','pk'],['doctor_id','int','fk'],['patient_id','int','fk'],['appointment_id','int?','fk uq'],['token_no','int'],['category','text'],['status','text'],['queue_date','text'],['created_at','text'],['updated_at','text']], cons:[['UNIQUE(appointment_id)','One check-in per appointment.','FR-7'],['UNIQUE(doctor_id, queue_date, token_no)','Unique daily token numbers even under concurrent issue.','FR-6'],['CHECK status IN (...)','Only legal statuses can be persisted.','FR-10'],['INDEX idx_tokens_queue(doctor_id, queue_date, status)','Fast "today\'s active queue for doctor X".','NFR-7']] },
+  { id:'consultations', cols:[['id','int','pk'],['token_id','int','fk uq'],['notes','text'],['prescription','text'],['created_at','text']], cons:[['UNIQUE(token_id)','One consultation record per token.','FR-15']] },
+  { id:'notifications', cols:[['id','int','pk'],['token_id','int','fk'],['type','text'],['channel','text'],['message','text'],['created_at','text']], cons:[['UNIQUE(token_id, type, channel)','At-most-once notification per channel: recorded before send.','FR-13']] },
+];
+
+const FLOWS = {
+  book: {
+    title: 'Book appointment', frs: 'FR-4 · FR-5 · NFR-3',
+    parts: ['Receptionist','AppointmentController','AppointmentService','SlotRepository','PatientRepository','Database','AppointmentRepository'],
+    scenarios: {
+      'Slot free': [
+        ['Receptionist','AppointmentController','POST /api/appointments {slotId, patientId}','The front desk picks a free slot for a registered patient.'],
+        ['AppointmentController','AppointmentService','book({slotId, patientId})','The controller only parses the body. No rules here.'],
+        ['AppointmentService','SlotRepository','findById(slotId)','Unknown slot → NotFoundError (404).'],
+        ['AppointmentService','PatientRepository','findById(patientId)','Unknown patient → NotFoundError (404).'],
+        ['AppointmentService','Database','transaction(fn)','BEGIN IMMEDIATE: writes are serialised.', 'open'],
+        ['Database','AppointmentRepository','create(...) INSERT appointments','There is no "check then insert". The INSERT itself is the check.'],
+        ['AppointmentRepository','Database','row','UNIQUE(slot_id) accepted the row.','ret'],
+        ['Database','AppointmentService','COMMIT → appointment','Durable in WAL before the response goes out.','ret','close'],
+        ['AppointmentService','AppointmentController','appointment','','ret'],
+        ['AppointmentController','Receptionist','201 Created','','ret'],
+      ],
+      'Race lost (409)': [
+        ['Receptionist','AppointmentController','POST /api/appointments {slotId, patientId}','A second receptionist books the same slot a moment later.'],
+        ['AppointmentController','AppointmentService','book({slotId, patientId})',''],
+        ['AppointmentService','SlotRepository','findById(slotId)','The slot exists, so this passes.'],
+        ['AppointmentService','PatientRepository','findById(patientId)',''],
+        ['AppointmentService','Database','transaction(fn)','Waits for the first writer, then runs.','', 'open'],
+        ['Database','AppointmentRepository','create(...) INSERT appointments',''],
+        ['AppointmentRepository','Database','UNIQUE constraint failed','The database, not application code, rejects the duplicate.','ret err'],
+        ['Database','AppointmentService','ROLLBACK + throw','Nothing partial is written.','ret err','close'],
+        ['AppointmentService','AppointmentService','isUniqueViolation(err) → ConflictError','Translate a storage error into a business error.','self'],
+        ['AppointmentService','AppointmentController','throw ConflictError','No try/catch in the controller.','ret err'],
+        ['AppointmentController','Receptionist','409 Conflict','errorHandler maps ConflictError to 409 { error }.','ret err'],
+      ],
+    },
+  },
+  call: {
+    title: 'Call next patient', frs: 'FR-8 · FR-11 · FR-13 · FR-14',
+    parts: ['Receptionist','QueueController','QueueService','Database','TokenRepository','PriorityStrategy','EventBus','NotificationService','SocketGateway'],
+    scenarios: {
+      'Patient called': [
+        ['Receptionist','QueueController','POST /api/queues/:doctorId/call-next',''],
+        ['QueueController','QueueService','callNext(doctorId)',''],
+        ['QueueService','Database','transaction(fn)','','','open'],
+        ['Database','TokenRepository','findActive(doctorId, today)','Active = WAITING, CALLED or IN_CONSULTATION.'],
+        ['QueueService','PriorityStrategy','score(token, now) for each waiting','Aging wraps category weight: weight + 2 × minutes waited.'],
+        ['QueueService','QueueService','#order() → pick top','Ties fall back to arrival order (FIFO).','self'],
+        ['QueueService','TokenRepository','updateStatus(id, CALLED)','Token.call() via WaitingState. Illegal moves would throw.'],
+        ['Database','QueueService','COMMIT → token','','ret','close'],
+        ['QueueService','EventBus','publish(token.called)','Events go out only after commit, so listeners never see rolled-back data.'],
+        ['EventBus','NotificationService','#onCalled(token)','Record CALLED per channel, then deliver.'],
+        ['QueueService','EventBus','publish(queue.changed)',''],
+        ['EventBus','NotificationService','#onQueueChanged → TURN_NEAR to top-N','Patients now near the front are told once.'],
+        ['EventBus','SocketGateway','emit queue + summary','Display boards refresh with no polling.'],
+        ['QueueService','QueueController','token','','ret'],
+        ['QueueController','Receptionist','200 OK','','ret'],
+      ],
+      'Doctor busy (409)': [
+        ['Receptionist','QueueController','POST /api/queues/:doctorId/call-next',''],
+        ['QueueController','QueueService','callNext(doctorId)',''],
+        ['QueueService','Database','transaction(fn)','','','open'],
+        ['Database','TokenRepository','findActive(doctorId, today)','Finds a token already CALLED or IN_CONSULTATION.'],
+        ['QueueService','QueueController','throw ConflictError','One patient with the doctor at a time (FR-11).','ret err','close'],
+        ['QueueController','Receptionist','409 Conflict','No event is published.','ret err'],
+      ],
+      'Queue empty (404)': [
+        ['Receptionist','QueueController','POST /api/queues/:doctorId/call-next',''],
+        ['QueueController','QueueService','callNext(doctorId)',''],
+        ['QueueService','Database','transaction(fn)','','','open'],
+        ['Database','TokenRepository','findActive(doctorId, today)','No WAITING tokens.'],
+        ['QueueService','QueueController','throw NotFoundError','','ret err','close'],
+        ['QueueController','Receptionist','404 Not Found','','ret err'],
+      ],
+    },
+  },
+  walkin: {
+    title: 'Issue walk-in token', frs: 'FR-6 · FR-8',
+    parts: ['Receptionist','QueueController','QueueService','CategoryResolver','Database','TokenRepository','EventBus'],
+    scenarios: {
+      'Token issued': [
+        ['Receptionist','QueueController','POST /api/tokens {doctorId, patientId, isEmergency}',''],
+        ['QueueController','QueueService','issueWalkIn(dto)',''],
+        ['QueueService','QueueService','requireFields + load doctor, patient','Missing fields → 400, unknown ids → 404.','self'],
+        ['QueueService','CategoryResolver','resolve(ctx)','Emergency → Senior (≥60) → Appointment → Walk-in. First match wins.'],
+        ['CategoryResolver','QueueService','EMERGENCY | SENIOR | APPOINTMENT | WALKIN','','ret'],
+        ['QueueService','Database','transaction(fn)','','','open'],
+        ['Database','TokenRepository','nextTokenNo(doctorId, today)','Read and insert share one transaction, so two desks never get the same number.'],
+        ['Database','TokenRepository','create(token with category)','Status starts at WAITING.'],
+        ['Database','QueueService','COMMIT → token','','ret','close'],
+        ['QueueService','EventBus','publish(queue.changed)','Boards and TURN_NEAR react.'],
+        ['QueueService','QueueController','token','','ret'],
+        ['QueueController','Receptionist','201 Created','','ret'],
+      ],
+    },
+  },
+};
+
+/* ===================== HELPERS ===================== */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const byId = Object.fromEntries(C.map(c => [c.id, c]));
+const store = { get(k, d) { try { const v = localStorage.getItem('mq-lld-' + k); return v == null ? d : v; } catch { return d; } }, set(k, v) { try { localStorage.setItem('mq-lld-' + k, v); } catch {} } };
+const clsChip = id => byId[id] ? `<button class="chip" data-goto="${id}">${esc(id)}</button>` : `<span class="chip static">${esc(id)}</span>`;
+
+/* ===================== VIEWS ===================== */
+const VIEWS = [
+  ['overview','Overview'], ['classes','Classes'], ['flows','Flows'], ['lifecycle','Token lifecycle'],
+  ['priority','Priority queue'], ['data','Data model'], ['api','API'], ['trace','Traceability'],
+];
+let selected = store.get('sel', 'QueueService');
+let lens = null; // {type:'pattern'|'solid', id}
+
+function render(view) {
+  if (!VIEWS.some(v => v[0] === view)) view = 'overview';
+  $('#tabs').innerHTML = VIEWS.map(([id, n]) => `<a href="#${id}"${id === view ? ' aria-current="page"' : ''}>${n}</a>`).join('');
+  const main = $('#main');
+  main.innerHTML = '';
+  ({ overview, classes, flows, lifecycle, priority, data, api, trace })[view](main);
+  const cur = $('#tabs [aria-current]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+/* ---------- Overview ---------- */
+function overview(el) {
+  const chips = layer => C.filter(c => c.layer === layer && c.kind !== 'state').map(c => clsChip(c.id)).join('');
+  el.innerHTML = `
+  <section class="view">
+    <div class="head">
+      <div class="eyebrow">Hospital queue · Node + SQLite</div>
+      <h2>How MediQueue is built</h2>
+      <p class="lede">Doctor schedules, appointment booking and a live walk-in queue per doctor. Patients are served by priority (emergencies and seniors first), aging stops anyone starving, several receptionists can work at once, and nothing is lost on a crash. Click any class to open it in the class map.</p>
+    </div>
+    <div class="facts">
+      <span><b>16</b>functional reqs</span><span><b>8</b>non-functional</span><span><b>20</b>REST endpoints</span><span><b>9</b>design patterns</span><span><b>7</b>tables</span><span><b>5</b>test suites</span>
+    </div>
+    <div class="contract"><span>HTTP / WebSocket</span>→<span>Controller · parse only</span>→<span>Service · rules + tx + events</span>→<span>Repository · SQL only</span>→<span>SQLite (WAL)</span></div>
+    <div class="stack">
+      <div class="layers">
+        <div class="layer"><div class="name">Controllers<small>No business logic, no try/catch</small></div><div class="chips">${chips('ctrl')}</div></div>
+        <div class="flowdown">calls ↓</div>
+        <div class="layer"><div class="name">Services<small>Know nothing about HTTP</small></div><div class="chips">${chips('svc')}</div></div>
+        <div class="flowdown">uses ↓</div>
+        <div class="layer split"><div class="name">Domain &amp; rules<small>Pure, testable</small></div>
+          <div><div class="sub">domain</div><div class="chips">${chips('dom')}</div></div>
+          <div><div class="sub">strategies · notifiers</div><div class="chips">${chips('strat')}${chips('notif')}</div></div></div>
+        <div class="flowdown">persists via ↓</div>
+        <div class="layer"><div class="name">Repositories<small>All SQL lives here</small></div><div class="chips">${chips('repo')}</div></div>
+        <div class="flowdown">↓</div>
+        <div class="layer"><div class="name">Infrastructure<small>Injected, swappable</small></div><div class="chips">${chips('infra')}</div></div>
+      </div>
+      <button class="rootbar" data-goto="container">container.js · builds &amp; wires every layer</button>
+    </div>
+    <div class="rules">
+      <div class="panel"><h3>Correctness lives in the database</h3><p>UNIQUE constraints stop double-booking, double check-in and duplicate notifications even across processes. No in-memory locks.</p></div>
+      <div class="panel"><h3>The queue is never only in memory</h3><p>Every read recomputes the queue from SQLite. A crash loses nothing that was committed.</p></div>
+      <div class="panel"><h3>Extend by adding, not editing</h3><p>A new category, priority rule or notification channel is a new class registered in container.js.</p></div>
+    </div>
+  </section>`;
+}
+
+/* ---------- Classes ---------- */
+function classes(el) {
+  const pkgs = LAYERS.map(L => `<div class="pkg"><h4>${L.name.toLowerCase()} / <span style="opacity:.7">${L.note}</span></h4><div class="cards">${C.filter(c => c.layer === L.id).map(c => `<button class="cls" data-cls="${c.id}">${c.id}<i>${c.kind === 'class' ? '' : c.kind}</i></button>`).join('')}</div></div>`).join('');
+  el.innerHTML = `
+  <section class="view">
+    <div class="head"><div class="eyebrow">Class map</div><h2>Every class, with what it depends on</h2>
+      <p class="lede">Select a class to see its responsibility, members, collaborators and the requirements it satisfies. Dashed outlines are its direct dependencies. Use a lens to highlight every class taking part in a pattern or principle.</p></div>
+    <div class="panel lens">
+      <div class="label">Pattern lens</div><div class="chips" id="plens">${PATTERNS.map(p => `<button class="chip" data-lens="pattern:${p.id}">${p.label || p.id}</button>`).join('')}</div>
+      <div class="label">SOLID lens</div><div class="chips" id="slens">${SOLID.map(s => `<button class="chip" data-lens="solid:${s.id}">${s.id} · ${s.name}</button>`).join('')}</div>
+      <div id="lensnote"></div>
+    </div>
+    <div class="cls-grid">
+      <div class="panel" id="pkgs">${pkgs}</div>
+      <aside class="panel detail" id="detail"></aside>
+    </div>
+  </section>`;
+  paintClasses();
+}
+function paintClasses() {
+  const c = byId[selected] || byId.QueueService;
+  const users = C.filter(x => x.deps.includes(c.id)).map(x => x.id);
+  let hits = null;
+  if (lens) {
+    hits = lens.type === 'pattern' ? PATTERNS.find(p => p.id === lens.id).who : C.filter(x => (x.solid || []).includes(lens.id)).map(x => x.id);
+  }
+  document.querySelectorAll('.cls').forEach(b => {
+    const id = b.dataset.cls;
+    b.classList.toggle('sel', id === c.id);
+    b.classList.toggle('rel', !lens && id !== c.id && c.deps.includes(id));
+    b.classList.toggle('hit', !!hits && hits.includes(id) && id !== c.id);
+    b.classList.toggle('dim', !!hits && !hits.includes(id) && id !== c.id);
+  });
+  document.querySelectorAll('[data-lens]').forEach(b => b.classList.toggle('on', !!lens && b.dataset.lens === `${lens.type}:${lens.id}`));
+  const note = $('#lensnote');
+  if (note) {
+    if (!lens) note.innerHTML = '';
+    else if (lens.type === 'pattern') { const p = PATTERNS.find(x => x.id === lens.id); note.innerHTML = `<p class="lensnote"><b>${p.label || p.id}</b> (${p.kind}). ${esc(p.text)}</p>`; }
+    else { const s = SOLID.find(x => x.id === lens.id); note.innerHTML = `<p class="lensnote"><b>${s.name}.</b> ${esc(s.text)}</p>`; }
+  }
+  const pats = (c.patterns || []).map(p => { const P = PATTERNS.find(x => x.id === p); return `<button class="chip" data-lens="pattern:${p}">${P ? (P.label || P.id) : p}</button>`; }).join('');
+  const sol = (c.solid || []).map(s => `<button class="chip" data-lens="solid:${s}">${s}</button>`).join('');
+  $('#detail').innerHTML = `
+    <div><div class="kind">${esc(c.kind)} · ${LAYERS.find(l => l.id === c.layer).name}</div><h3>${esc(c.id)}</h3></div>
+    <p>${esc(c.role)}</p>
+    <div class="methods">${c.methods.map(m => `<div class="${m.startsWith('-') ? 'priv' : ''}">${esc(m)}</div>`).join('')}</div>
+    <dl class="kv">
+      <dt>file</dt><dd><code>src/${esc(c.file)}</code></dd>
+      <dt>depends on</dt><dd class="chips">${c.deps.length ? c.deps.map(clsChip).join('') : '<span style="color:var(--muted)">nothing</span>'}</dd>
+      <dt>used by</dt><dd class="chips">${users.length ? users.map(clsChip).join('') : '<span style="color:var(--muted)">entry point</span>'}</dd>
+      ${pats ? `<dt>patterns</dt><dd class="chips">${pats}</dd>` : ''}
+      ${sol ? `<dt>SOLID</dt><dd class="chips">${sol}</dd>` : ''}
+      ${(c.fr || []).length || (c.nfr || []).length ? `<dt>satisfies</dt><dd class="chips">${[...(c.fr || []), ...(c.nfr || [])].map(f => `<a class="chip" href="#trace" data-fr="${f}">${f}</a>`).join('')}</dd>` : ''}
+    </dl>`;
+}
+
+/* ---------- Flows ---------- */
+let flowKey = store.get('flow', 'call'), scenKey = null, step = 0, playT = null;
+function flows(el) {
+  if (!FLOWS[flowKey]) flowKey = 'call';
+  const F = FLOWS[flowKey];
+  if (!scenKey || !F.scenarios[scenKey]) scenKey = Object.keys(F.scenarios)[0];
+  el.innerHTML = `
+  <section class="view">
+    <div class="head"><div class="eyebrow">Sequence diagrams</div><h2>Step through a request</h2>
+      <p class="lede">Pick a flow and an outcome, then step through it. Each step says what happens and why it is designed that way.</p></div>
+    <div class="flowpick">${Object.entries(FLOWS).map(([k, f]) => `<button class="btn${k === flowKey ? ' primary' : ''}" data-flow="${k}">${f.title}</button>`).join('')}</div>
+    <div class="row"><span class="eyebrow">${F.frs}</span><span style="flex:1"></span>${Object.keys(F.scenarios).map(s => `<button class="chip${s === scenKey ? ' on' : ''}" data-scen="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+    <div class="seqbox" id="seq"></div>
+    <div class="panel stepper"><div class="stepnum" id="stepnum"></div><div class="stepnote" id="stepnote"></div></div>
+    <div class="row"><button class="btn" id="prev">← Back</button><button class="btn primary" id="next">Next →</button><button class="btn" id="play">Play</button><button class="btn" id="restart">Restart</button><span style="color:var(--muted);font-size:.82rem">Keyboard: ← →</span></div>
+  </section>`;
+  paintSeq();
+}
+function paintSeq() {
+  const F = FLOWS[flowKey], msgs = F.scenarios[scenKey], P = F.parts;
+  const CW = 128, LX = 72, TOP = 54, RH = 38, H = TOP + msgs.length * RH + 30, W = LX * 2 + (P.length - 1) * CW;
+  const x = p => LX + P.indexOf(p) * CW;
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(F.title)} sequence diagram">
+  <defs>${['past','cur','err'].map(k => `<marker id="a-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-${k}"/></marker>`).join('')}</defs>`;
+  // transaction box
+  const o = msgs.findIndex(m => (m[5] || m[4] || '').includes('open')), cl = msgs.findIndex(m => (m[5] || m[4] || '').includes('close'));
+  if (o >= 0 && cl >= 0 && step >= o) {
+    const dx = x('Database');
+    s += `<rect class="seq-act" x="${dx - 6}" y="${TOP + o * RH + 14}" width="12" height="${(Math.min(cl, step) - o) * RH + 10}" rx="2"/>`;
+  }
+  P.forEach(p => {
+    const px = x(p);
+    s += `<line class="seq-life" x1="${px}" y1="34" x2="${px}" y2="${H - 6}"/>`;
+    s += `<g class="seq-part"><rect x="${px - 60}" y="6" width="120" height="28" rx="4"/><text x="${px}" y="24" text-anchor="middle">${esc(shortName(p))}</text></g>`;
+  });
+  msgs.forEach((m, i) => {
+    const [from, to, label] = m, kind = (m[4] || '');
+    const isRet = kind.includes('ret'), isErr = kind.includes('err'), isSelf = kind.includes('self') || from === to;
+    const st = i < step ? 'past' : i === step ? 'cur' : 'future';
+    const mk = st === 'cur' ? (isErr ? 'err' : 'cur') : 'past';
+    const y = TOP + i * RH + 20, x1 = x(from), x2 = x(to);
+    s += `<g class="seq-msg ${st}${isRet ? ' ret' : ''}${isErr ? ' err' : ''}">`;
+    if (isSelf) {
+      s += `<path d="M${x1},${y - 6} h34 v14 h-32" marker-end="url(#a-${mk})"/><text x="${x1 + 40}" y="${y + 4}">${esc(label)}</text>`;
+    } else {
+      const dir = x2 > x1 ? 1 : -1;
+      s += `<line x1="${x1}" y1="${y}" x2="${x2 - dir * 2}" y2="${y}" marker-end="url(#a-${mk})"/>`;
+      const lx = (x1 + x2) / 2;
+      s += `<text x="${lx}" y="${y - 6}" text-anchor="middle">${esc(label)}</text>`;
+    }
+    s += `<text class="num" x="${Math.min(x1, isSelf ? x1 : x2) - 4}" y="${y - 6}" text-anchor="end">${i + 1}</text></g>`;
+  });
+  s += '</svg>';
+  $('#seq').innerHTML = s;
+  const m = msgs[step];
+  $('#stepnum').textContent = String(step + 1).padStart(2, '0');
+  $('#stepnote').innerHTML = `<b>${esc(m[0])} → ${esc(m[1])}</b><div class="mono" style="margin-top:2px">${esc(m[2])}</div><p>${esc(m[3] || 'Step ' + (step + 1) + ' of ' + msgs.length + '.')}</p>`;
+  $('#prev').disabled = step === 0; $('#next').disabled = step === msgs.length - 1;
+  const cur = $('#seq .seq-msg.cur');
+  if (cur) { const box = $('#seq'), b = cur.getBBox(); if (b.x < box.scrollLeft || b.x + b.width > box.scrollLeft + box.clientWidth) box.scrollTo({ left: Math.max(0, b.x - 40), behavior: 'smooth' }); }
+}
+const shortName = p => p.replace('Controller', 'Ctrl').replace('Repository', 'Repo').replace('NotificationService', 'NotificationSvc');
+function stopPlay() { clearInterval(playT); playT = null; const b = $('#play'); if (b) b.textContent = 'Play'; }
+
+/* ---------- Lifecycle ---------- */
+const SM = { WAITING:[70,110], CALLED:[260,110], IN_CONSULTATION:[470,110], DONE:[680,110], NO_SHOW:[260,240] };
+const MOVES = { WAITING:{call:'CALLED'}, CALLED:{start:'IN_CONSULTATION', noShow:'NO_SHOW'}, IN_CONSULTATION:{complete:'DONE'}, DONE:{}, NO_SHOW:{} };
+const VERB = { call:'call', start:'start', complete:'complete', noShow:'mark no-show for' };
+let tok = 'WAITING', tlog = [], lastEdge = null;
+function lifecycle(el) {
+  el.innerHTML = `
+  <section class="view">
+    <div class="head"><div class="eyebrow">State pattern · FR-10</div><h2>Drive a token through its lifecycle</h2>
+      <p class="lede">Token delegates every move to its current state object. Each state overrides only the moves that are legal from it; everything else falls through to the base class, which throws <code>ConflictError</code> (409). Try an illegal move.</p></div>
+    <div class="life">
+      <div class="panel"><div class="scroll-x" id="sm"></div>
+        <div class="row" style="margin-top:12px">${Object.keys(VERB).map(v => `<button class="btn" data-move="${v}">token.${v}()</button>`).join('')}<button class="btn" data-move="reset">Issue new token</button></div></div>
+      <div class="panel" style="display:grid;gap:10px;align-content:start"><h3>Transition log</h3><div class="log" id="tlog"></div></div>
+    </div>
+    <div class="panel"><h3>Why not a status switch?</h3><p class="lede" style="margin-top:6px">With an <code>if/else</code> on status, every new state means editing every method. Here a new state is one subclass, and illegal moves are rejected by default instead of by remembering to add a check. The database adds a second guard: <code>CHECK status IN (...)</code>.</p></div>
+  </section>`;
+  paintSM();
+}
+function paintSM() {
+  const E = [['WAITING','CALLED','call'],['CALLED','IN_CONSULTATION','start'],['IN_CONSULTATION','DONE','complete'],['CALLED','NO_SHOW','noShow']];
+  const w = { WAITING:110, CALLED:110, IN_CONSULTATION:150, DONE:90, NO_SHOW:100 };
+  let s = `<svg width="760" height="300" viewBox="0 0 760 300" role="img" aria-label="Token state machine"><defs><marker id="sm-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk-sm"/></marker></defs>`;
+  s += `<circle cx="14" cy="110" r="7" style="fill:var(--ink)"/><path d="M21,110 H${SM.WAITING[0] - w.WAITING / 2 - 3}" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#sm-a)"/>`;
+  E.forEach(([a, b, l]) => {
+    const [ax, ay] = SM[a], [bx, by] = SM[b];
+    let d, tx, ty;
+    if (ay === by) { d = `M${ax + w[a] / 2},${ay} H${bx - w[b] / 2 - 3}`; tx = (ax + w[a] / 2 + bx - w[b] / 2) / 2; ty = ay - 10; }
+    else { d = `M${ax},${ay + 20} V${by - 23}`; tx = ax + 10; ty = (ay + by) / 2 + 4; }
+    s += `<g class="sm-edge${lastEdge === l ? ' live' : ''}"><path d="${d}" marker-end="url(#sm-a)"/><text x="${tx}" y="${ty}" text-anchor="${ay === by ? 'middle' : 'start'}">${l}()</text></g>`;
+  });
+  Object.entries(SM).forEach(([n, [x, y]]) => {
+    const term = n === 'DONE' || n === 'NO_SHOW';
+    s += `<g class="sm-node${n === tok ? ' cur' : ''}${term ? ' term' : ''}"><rect x="${x - w[n] / 2}" y="${y - 20}" width="${w[n]}" height="40" rx="20"/><text x="${x}" y="${y + 4}" text-anchor="middle">${n}</text></g>`;
+  });
+  s += `<text x="680" y="160" text-anchor="middle" style="fill:var(--muted);font:11px var(--mono)">terminal</text><text x="260" y="290" text-anchor="middle" style="fill:var(--muted);font:11px var(--mono)">terminal</text></svg>`;
+  $('#sm').innerHTML = s;
+  $('#tlog').innerHTML = tlog.length ? tlog.slice().reverse().map(e => `<div class="${e.c}">${esc(e.t)}</div>`).join('') : '<div>Token #4 issued → WAITING</div>';
+  document.querySelectorAll('[data-move]').forEach(b => { const v = b.dataset.move; if (v !== 'reset') b.classList.toggle('primary', !!MOVES[tok][v]); });
+}
+
+/* ---------- Priority ---------- */
+const WEIGHT = { EMERGENCY:1000, SENIOR:300, APPOINTMENT:200, WALKIN:100 };
+const BASE = 9 * 60; // 09:00
+let ppm = Number(store.get('ppm', 2)), nowMin = 10 * 60 + 20;
+let pq = [
+  { no:1, name:'Asha', age:34, cat:'WALKIN', at:9*60+0 },
+  { no:2, name:'Neha', age:25, cat:'WALKIN', at:9*60+5 },
+  { no:3, name:'Kamla', age:67, cat:'SENIOR', at:9*60+30 },
+  { no:4, name:'Rohit', age:41, cat:'APPOINTMENT', at:9*60+50 },
+  { no:5, name:'Imran', age:29, cat:'EMERGENCY', at:10*60+15 },
+  { no:6, name:'Farah', age:38, cat:'APPOINTMENT', at:10*60+10 },
+];
+const hhmm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+function resolveChain(ctx) {
+  const rules = [
+    ['EmergencyRule', ctx.isEmergency ? 'EMERGENCY' : null, 'isEmergency'],
+    ['SeniorCitizenRule(60)', ctx.age >= 60 ? 'SENIOR' : null, 'age ≥ 60'],
+    ['AppointmentRule', ctx.appt ? 'APPOINTMENT' : null, 'has appointmentId'],
+    ['WalkInRule', 'WALKIN', 'always'],
+  ];
+  const win = rules.findIndex(r => r[1]);
+  return { rules, win, cat: rules[win][1] };
+}
+function priority(el) {
+  el.innerHTML = `
+  <section class="view">
+    <div class="head"><div class="eyebrow">Strategy + Decorator + Chain · FR-8 · FR-9 · FR-12</div><h2>Watch the queue reorder over time</h2>
+      <p class="lede">Score = category weight + aging points × minutes waited. Highest score is called next; ties go to whoever arrived first. Drag the clock and watch long-waiting walk-ins climb. Set aging to 0 to see plain category order, which lets walk-ins starve.</p></div>
+    <div class="prio">
+      <div class="board">
+        <div class="board-head"><div><label for="clock">Now · Dr. Mehta · 10 min per consult</label><div class="clock" id="clockv"></div></div>
+          <div><label>Aging (pts / min)</label><div class="seg" id="ppm">${[0,2,5].map(v => `<button data-ppm="${v}" class="${v === ppm ? 'on' : ''}">${v}</button>`).join('')}</div></div></div>
+        <input type="range" id="clock" min="${10*60+15}" max="${13*60}" step="5" value="${nowMin}" aria-label="Current time">
+        <div id="q" style="display:grid;gap:6px"></div>
+        <div style="font-family:var(--mono);font-size:.7rem;opacity:.7">bar: solid = category weight · hatched = aging points</div>
+      </div>
+      <div style="display:grid;gap:14px">
+        <div class="panel"><h3>Category weights</h3><div class="weights" style="margin-top:10px">${Object.entries(WEIGHT).map(([k, v]) => `<div><span class="cat c-${k}" style="margin:0">${k}</span><b>${v}</b></div>`).join('')}</div>
+          <p style="color:var(--muted);font-size:.84rem;margin-top:10px">At 2 pts/min a walk-in overtakes a newly arrived appointment after waiting 50 min longer, and a senior after 100 min. Emergency is effectively never overtaken.</p></div>
+        <form class="panel form" id="addf"><h3>Issue a token</h3>
+          <div class="row" style="flex-wrap:nowrap"><div class="f" style="flex:2"><label for="pname">Patient</label><input type="text" id="pname" value="Vikram"></div><div class="f" style="flex:1"><label for="page">Age</label><input type="number" id="page" value="72" min="0" max="130"></div></div>
+          <div class="checks"><label><input type="checkbox" id="pemerg"> Emergency</label><label><input type="checkbox" id="pappt" checked> Has appointment</label></div>
+          <div><div class="eyebrow" style="margin-bottom:6px">CategoryResolver chain</div><div class="chain" id="chain"></div></div>
+          <button class="btn primary" type="submit">Issue token at <span id="atnow"></span></button>
+        </form>
+      </div>
+    </div>
+  </section>`;
+  paintChain(); paintQ();
+}
+function chainCtx() { return { age: Number($('#page').value) || 0, isEmergency: $('#pemerg').checked, appt: $('#pappt').checked }; }
+function paintChain() {
+  const r = resolveChain(chainCtx());
+  $('#chain').innerHTML = r.rules.map((x, i) => `<div class="${i === r.win ? 'won' : i > r.win ? 'skip' : ''}"><span>${i + 1}. ${x[0]}</span><span>${i < r.win ? 'null' : i === r.win ? '→ ' + x[1] : 'not asked'}</span></div>`).join('');
+}
+function paintQ() {
+  $('#clockv').textContent = hhmm(nowMin);
+  $('#atnow').textContent = hhmm(nowMin);
+  const rows = pq.filter(t => t.at <= nowMin).map(t => {
+    const waited = nowMin - t.at, age = waited * ppm;
+    return { ...t, waited, age, score: WEIGHT[t.cat] + age };
+  }).sort((a, b) => b.score - a.score || a.at - b.at);
+  const max = Math.max(1200, ...rows.map(r => r.score));
+  $('#q').innerHTML = rows.map((r, i) => `<div class="qrow"><span class="pos">${i + 1}</span><span class="tok">#${String(r.no).padStart(2, '0')}</span>
+    <div class="who"><b>${esc(r.name)}</b><span class="cat c-${r.cat}">${r.cat}</span><small>arrived ${hhmm(r.at)} · waited ${r.waited} min · est. wait ${i * 10} min</small>
+      <div class="bar"><span class="c-${r.cat}" style="width:${WEIGHT[r.cat] / max * 100}%"></span><span class="age" style="width:${r.age / max * 100}%"></span></div></div>
+    <div class="score">${r.score}<small>${WEIGHT[r.cat]} + ${r.age}</small></div></div>`).join('') || '<div style="opacity:.7">Nobody waiting.</div>';
+}
+
+/* ---------- Data ---------- */
+let selT = store.get('table', 'tokens');
+const ER = { doctors:[20,40], patients:[20,210], slots:[225,40], appointments:[225,210], tokens:[440,125], consultations:[650,45], notifications:[650,205] };
+const EREDGES = [['doctors','slots','1 : N'],['doctors','tokens','1 : N'],['patients','appointments','1 : N'],['patients','tokens','1 : N'],['slots','appointments','1 : 0..1',1],['appointments','tokens','1 : 0..1',1],['tokens','consultations','1 : 0..1',1],['tokens','notifications','1 : N']];
+function data(el) {
+  const BW = 140, BH = 40, c = n => [ER[n][0] + BW / 2, ER[n][1] + BH / 2];
+  let svg = `<svg width="810" height="270" viewBox="0 0 810 270" role="img" aria-label="Entity relationship diagram">`;
+  EREDGES.forEach(([a, b, l, u]) => { const [x1, y1] = c(a), [x2, y2] = c(b), mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    svg += `<g class="er-edge${u ? ' uniq' : ''}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><rect x="${mx - 30}" y="${my - 8}" width="60" height="16" rx="3"/><text x="${mx}" y="${my + 4}" text-anchor="middle">${l}</text></g>`; });
+  Object.entries(ER).forEach(([n, [x, y]]) => { svg += `<g class="er-node${n === selT ? ' sel' : ''}" data-table="${n}" tabindex="0" role="button"><rect x="${x}" y="${y}" width="${BW}" height="${BH}" rx="5"/><text x="${x + BW / 2}" y="${y + 25}" text-anchor="middle">${n}</text></g>`; });
+  svg += '</svg>';
+  el.innerHTML = `
+  <section class="view">
+    <div class="head"><div class="eyebrow">SQLite · WAL · foreign_keys = ON</div><h2>Tables and the constraints that enforce the rules</h2>
+      <p class="lede">The teal edges are 1-to-0..1 relationships backed by a UNIQUE constraint. Those constraints are the concurrency guarantees: the database refuses the second writer, so no in-memory lock is needed. Select a table to jump to it.</p></div>
+    <div class="panel er scroll-x">${svg}</div>
+    <div class="tables">${TABLES.map(t => `<article class="tcard${t.id === selT ? ' sel' : ''}" id="t-${t.id}"><header><span>${t.id}</span><span style="opacity:.6">${t.cols.length} cols</span></header>
+      <ul>${t.cols.map(([n, ty, k]) => `<li><span>${n}${(k || '').split(' ').filter(Boolean).map(x => `<span class="k ${x}">${x.toUpperCase()}</span>`).join('')}</span><span>${ty}</span></li>`).join('')}</ul>
+      ${t.cons.length ? `<div class="cons">${t.cons.map(([k, w, f]) => `<div><code>${esc(k)}</code> <a class="chip" href="#trace" data-fr="${f}">${f}</a><p>${esc(w)}</p></div>`).join('')}</div>` : ''}</article>`).join('')}</div>
+  </section>`;
+}
+
+/* ---------- API ---------- */
+function api(el) {
+  el.innerHTML = `
+  <section class="view">
+    <div class="head"><div class="eyebrow">REST + WebSocket</div><h2>API surface</h2>
+      <p class="lede">Every route maps to exactly one service call. Errors always come back as <code>{ "error": message }</code> with the status carried by the thrown <code>AppError</code>.</p></div>
+    <input class="search" id="apiq" type="search" placeholder="Filter by path or service…" aria-label="Filter endpoints">
+    <div class="panel scroll-x" style="padding:6px"><table class="tbl"><thead><tr><th>Method</th><th>Path</th><th>Body / query</th><th>Service</th><th>Success</th><th>Errors</th></tr></thead><tbody id="apib"></tbody></table></div>
+    <div class="rules">
+      <div class="panel"><h3>WebSocket</h3><p><code>watch:doctor</code> joins room <code>doctor:&lt;id&gt;</code> and receives <code>queue</code>. <code>watch:summary</code> receives <code>summary</code>. Pushed on every <code>queue.changed</code>.</p></div>
+      <div class="panel"><h3>Error mapping</h3><p>ValidationError → 400 · NotFoundError → 404 · ConflictError → 409 · malformed JSON → 400 · anything else → 500 (logged).</p></div>
+    </div>
+  </section>`;
+  paintApi('');
+}
+function paintApi(q) {
+  q = q.toLowerCase();
+  $('#apib').innerHTML = API.filter(r => !q || r.join(' ').toLowerCase().includes(q)).map(([m, p, b, s, ok, er]) => {
+    const svc = s.split('.')[0];
+    return `<tr><td><span class="m ${m}">${m}</span></td><td class="path">${esc(p)}</td><td class="mono" style="font-size:.76rem">${esc(b)}</td><td>${byId[svc] ? `<button class="chip" data-goto="${svc}">${esc(s)}</button>` : esc(s)}</td><td class="st">${esc(ok)}</td><td class="st"><span class="e">${esc(er)}</span></td></tr>`;
+  }).join('');
+}
+
+/* ---------- Trace ---------- */
+let traceQ = '';
+function trace(el) {
+  el.innerHTML = `
+  <section class="view">
+    <div class="head"><div class="eyebrow">Requirement → design → code → proof</div><h2>Traceability matrix</h2>
+      <div class="traceflow"><span>Requirement</span>→<span>Class</span>→<span>Pattern</span>→<span>DB constraint</span>→<span>Test</span></div></div>
+    <input class="search" id="trq" type="search" placeholder="Filter, e.g. FR-5, Observer, UNIQUE…" aria-label="Filter requirements" value="${esc(traceQ)}">
+    <div class="panel scroll-x" style="padding:6px"><table class="tbl"><thead><tr><th>ID</th><th>Requirement</th><th>Class</th><th>Pattern</th><th>Constraint</th><th>Test</th></tr></thead><tbody id="trb"></tbody></table></div>
+    <div class="panel scroll-x" style="padding:6px"><table class="tbl"><thead><tr><th>ID</th><th>Quality</th><th>How it is met</th><th>Where</th></tr></thead><tbody>${NFRS.map(([i, q, h, w]) => `<tr><td class="fr">${i}</td><td>${q}</td><td>${esc(h)}</td><td>${clsChip(w)}</td></tr>`).join('')}</tbody></table></div>
+  </section>`;
+  paintTrace();
+}
+function paintTrace() {
+  const q = traceQ.toLowerCase();
+  const exact = /^n?fr-\d+$/i.test(traceQ.trim());
+  $('#trb').innerHTML = FRS.filter(r => !q || (exact ? r[0].toLowerCase() === q.trim() : r.join(' ').toLowerCase().includes(q))).map(([i, r, c, p, k, t]) =>
+    `<tr><td class="fr">${i}</td><td>${esc(r)}</td><td>${clsChip(c)}</td><td>${esc(p)}</td><td class="mono" style="font-size:.76rem">${esc(k)}</td><td class="mono" style="font-size:.76rem">${esc(t)}</td></tr>`).join('') || '<tr><td colspan="6" style="color:var(--muted)">No requirement matches. Clear the filter to see all 16.</td></tr>';
+}
+
+/* ===================== EVENTS ===================== */
+document.addEventListener('click', e => {
+  const t = e.target.closest('button, a, [data-table]');
+  if (!t) return;
+  const d = t.dataset;
+  if (d.goto) { selected = d.goto; store.set('sel', selected); lens = null; if (location.hash === '#classes') { paintClasses(); window.scrollTo({ top: 0, behavior: 'smooth' }); } else location.hash = 'classes'; return; }
+  if (d.cls) { selected = d.cls; store.set('sel', selected); paintClasses(); if (window.innerWidth < 900) $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  if (d.lens) { const [type, id] = d.lens.split(':'); lens = lens && lens.type === type && lens.id === id ? null : { type, id }; if (location.hash !== '#classes') { location.hash = 'classes'; } else paintClasses(); return; }
+  if (d.fr) { traceQ = d.fr; if (location.hash === '#trace') { $('#trq').value = traceQ; paintTrace(); } return; }
+  if (d.flow) { stopPlay(); flowKey = d.flow; store.set('flow', flowKey); scenKey = null; step = 0; flows($('#main')); return; }
+  if (d.scen) { stopPlay(); scenKey = d.scen; step = 0; flows($('#main')); return; }
+  if (t.id === 'next') { stopPlay(); step++; paintSeq(); return; }
+  if (t.id === 'prev') { stopPlay(); step--; paintSeq(); return; }
+  if (t.id === 'restart') { stopPlay(); step = 0; paintSeq(); return; }
+  if (t.id === 'play') {
+    if (playT) { stopPlay(); return; }
+    const n = FLOWS[flowKey].scenarios[scenKey].length; if (step >= n - 1) step = 0;
+    t.textContent = 'Pause'; paintSeq();
+    playT = setInterval(() => { if (step >= n - 1) return stopPlay(); step++; paintSeq(); }, 1300); return;
+  }
+  if (d.move) {
+    if (d.move === 'reset') { tok = 'WAITING'; lastEdge = null; tlog = [{ t: 'New token issued → WAITING', c: 'good' }]; }
+    else if (MOVES[tok][d.move]) { const n = MOVES[tok][d.move]; tlog.push({ t: `${d.move}(): ${tok} → ${n}`, c: 'good' }); tok = n; lastEdge = d.move; }
+    else { tlog.push({ t: `409 ConflictError: Cannot ${VERB[d.move]} a token that is ${tok}`, c: 'bad' }); lastEdge = null; }
+    paintSM(); return;
+  }
+  if (d.ppm) { ppm = Number(d.ppm); store.set('ppm', ppm); document.querySelectorAll('[data-ppm]').forEach(b => b.classList.toggle('on', b === t)); paintQ(); return; }
+  if (d.table) { selT = d.table; store.set('table', selT); data($('#main')); $('#t-' + selT).scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+});
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea')) return;
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.table) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+  if (location.hash !== '#flows') return;
+  const n = FLOWS[flowKey].scenarios[scenKey].length;
+  if (e.key === 'ArrowRight' && step < n - 1) { stopPlay(); step++; paintSeq(); }
+  if (e.key === 'ArrowLeft' && step > 0) { stopPlay(); step--; paintSeq(); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'clock') { nowMin = Number(e.target.value); paintQ(); }
+  if (e.target.id === 'apiq') paintApi(e.target.value);
+  if (e.target.id === 'trq') { traceQ = e.target.value; paintTrace(); }
+  if (['page', 'pemerg', 'pappt'].includes(e.target.id)) paintChain();
+});
+document.addEventListener('change', e => { if (['pemerg', 'pappt'].includes(e.target.id)) paintChain(); });
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'addf') return;
+  e.preventDefault();
+  const ctx = chainCtx(), name = $('#pname').value.trim() || 'Patient';
+  pq.push({ no: Math.max(...pq.map(t => t.no)) + 1, name, age: ctx.age, cat: resolveChain(ctx).cat, at: nowMin });
+  paintQ();
+});
+window.addEventListener('hashchange', () => { stopPlay(); render(location.hash.slice(1)); window.scrollTo(0, 0); });
+render(location.hash.slice(1) || 'overview');
+</script>
